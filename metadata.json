@@ -1,0 +1,6 @@
+{
+  "name": "KASA Warehouse Management System",
+  "description": "ระบบจัดการคลังสินค้า รับเข้า-ส่งออก เช็คสต๊อก คลังและโซน บันทึกผู้รับ/ส่งออก สถานะสินค้าชำรุด แจ้งเตือน และระบบสนับสนุน Line OA/LIFF",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
