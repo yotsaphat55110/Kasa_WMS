@@ -66,7 +66,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
       unit,
       size,
       brand,
-      minThreshold
+      minThreshold: Math.max(0, Number(minThreshold) || 0)
     });
 
     onClose();

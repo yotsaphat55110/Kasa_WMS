@@ -10,6 +10,7 @@ interface LineWebhookLog {
   userId?: string;
   userName?: string;
   userPictureUrl?: string;
+  statusMessage?: string;
   groupId?: string;
   groupName?: string;
   groupPictureUrl?: string;
@@ -21,6 +22,9 @@ interface LineWebhookLog {
   status: 'SUCCESS' | 'INFO' | 'WARNING' | 'ERROR';
   rawPayload?: any;
 }
+
+// Active in-memory LINE Channel Access Token
+let activeLineChannelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN || '';
 
 // In-memory logs storage with initial demo entries
 const webhookLogs: LineWebhookLog[] = [
@@ -95,10 +99,12 @@ async function tryFetchLineProfile(userId: string, token?: string, groupId?: str
       headers: { Authorization: `Bearer ${token}` }
     });
     if (res.ok) {
-      return await res.json() as { displayName?: string; pictureUrl?: string };
+      return await res.json() as { displayName?: string; pictureUrl?: string; statusMessage?: string; userId?: string };
     }
-  } catch {
-    // Ignore fetch errors
+    const errText = await res.text();
+    console.warn(`[LINE Profile Fetch] Status ${res.status} for userId ${userId}:`, errText);
+  } catch (err) {
+    console.warn(`[LINE Profile Fetch] Error for userId ${userId}:`, err);
   }
   return null;
 }
@@ -199,20 +205,41 @@ async function startServer() {
         let status: LineWebhookLog['status'] = 'INFO';
         let userName = '';
         let userPictureUrl = '';
+        let userStatusMessage = '';
         let groupName = '';
         let groupPictureUrl = '';
+
+        // Try fetching user profile from LINE Messaging API if token and userId are available
+        if (userId && activeLineChannelAccessToken) {
+          const profile = await tryFetchLineProfile(userId, activeLineChannelAccessToken, groupId);
+          if (profile) {
+            userName = profile.displayName || '';
+            userPictureUrl = profile.pictureUrl || '';
+            userStatusMessage = profile.statusMessage || '';
+          }
+        }
+
+        // Try fetching group summary if token and groupId are available
+        if (groupId && activeLineChannelAccessToken) {
+          const groupSummary = await tryFetchGroupSummary(groupId, activeLineChannelAccessToken);
+          if (groupSummary) {
+            groupName = groupSummary.groupName || '';
+            groupPictureUrl = groupSummary.pictureUrl || '';
+          }
+        }
 
         switch (eventType) {
           case 'message': {
             messageType = event.message?.type || 'text';
             messageText = event.message?.text || (messageType === 'sticker' ? '[สติกเกอร์ LINE]' : `[ไฟล์แนบ/มัลติมีเดีย: ${messageType}]`);
+            const senderLabel = userName ? `คุณ "${userName}"` : (userId ? `LINE User (${userId.slice(-6)})` : 'ผู้ใช้');
             
             if (sourceType === 'group') {
-              details = `ได้รับข้อความ "${messageText}" จากผู้ใช้ (User ID: ${userId || 'ไม่ระบุ'}) ในกลุ่ม (Group ID: ${groupId})`;
+              details = `ได้รับข้อความ "${messageText}" จาก ${senderLabel} ในกลุ่ม (Group ID: ${groupId})`;
             } else if (sourceType === 'room') {
-              details = `ได้รับข้อความ "${messageText}" จากผู้ใช้ (User ID: ${userId || 'ไม่ระบุ'}) ในห้องสนทนา (Room ID: ${roomId})`;
+              details = `ได้รับข้อความ "${messageText}" จาก ${senderLabel} ในห้องสนทนา (Room ID: ${roomId})`;
             } else {
-              details = `ได้รับข้อความ "${messageText}" จากผู้ใช้ส่วนตัว (User ID: ${userId})`;
+              details = `ได้รับข้อความ "${messageText}" จาก ${senderLabel} (แชตส่วนตัว)`;
             }
             status = 'INFO';
             break;
@@ -246,13 +273,18 @@ async function startServer() {
           }
 
           case 'follow': {
-            details = `👤 ผู้ใช้กดติดตาม / เพิ่มเพื่อนกับ LINE Official Account (User ID: ${userId})`;
+            if (userName) {
+              details = `👤 คุณ "${userName}" ได้กดติดตาม / เพิ่มเพื่อนกับ LINE Official Account เรียบร้อยแล้ว`;
+            } else {
+              details = `👤 ผู้ใช้กดติดตาม / เพิ่มเพื่อนกับ LINE Official Account (User ID: ${userId})`;
+            }
             status = 'SUCCESS';
             break;
           }
 
           case 'unfollow': {
-            details = `🚫 ผู้ใช้บล็อกหรือยกเลิกการติดตาม LINE Official Account (User ID: ${userId})`;
+            const who = userName ? `คุณ "${userName}"` : `User ID: ${userId}`;
+            details = `🚫 ผู้ใช้ (${who}) บล็อกหรือยกเลิกการติดตาม LINE Official Account`;
             status = 'WARNING';
             break;
           }
@@ -278,7 +310,8 @@ async function startServer() {
           sourceType: sourceType as LineWebhookLog['sourceType'],
           userId,
           userName: userName || (userId ? `LINE User (${userId.slice(-6)})` : undefined),
-          userPictureUrl,
+          userPictureUrl: userPictureUrl || undefined,
+          statusMessage: userStatusMessage || undefined,
           groupId: groupId || roomId,
           groupName: groupName || (groupId ? `กลุ่ม LINE (${groupId.slice(-6)})` : undefined),
           groupPictureUrl,
@@ -356,14 +389,34 @@ async function startServer() {
         replyToken: `reply-${now}`
       };
     } else if (actionType === 'follow') {
-      const uId = `U${Math.random().toString(36).substring(2, 12)}`;
+      const uId = `U${Math.random().toString(36).substring(2, 10)}${Math.random().toString(36).substring(2, 6)}`;
+      const sampleFollowers = [
+        {
+          name: 'คุณพงศกร กิจเจริญ (ผู้จัดการฝ่ายจัดส่ง)',
+          pic: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
+          status: 'ฝ่ายประสานงานคลังสินค้า KASA'
+        },
+        {
+          name: 'คุณณิชาภัทร วงศ์สวัสดิ์ (หัวหน้าคลัง)',
+          pic: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=200',
+          status: 'ผู้จัดการคลังสินค้าเคมีภัณฑ์'
+        },
+        {
+          name: 'คุณกิตติศักดิ์ พัฒนากุล (เจ้าหน้าที่ตรวจรับ)',
+          pic: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200',
+          status: 'ทีมขนส่งและโลจิสติกส์ KASA'
+        }
+      ];
+      const picked = sampleFollowers[Math.floor(Math.random() * sampleFollowers.length)];
+
       syntheticEvent = {
         type: 'follow',
         timestamp: now,
         source: {
           type: 'user',
           userId: uId
-        }
+        },
+        _simulatedProfile: picked
       };
     } else {
       // Default verify test
@@ -402,8 +455,15 @@ async function startServer() {
         ? `ได้รับข้อความ "${msgText}" จาก ${customUserName || 'พนักงานคลัง'} (User ID: ${uId}) ในกลุ่ม "${customGroupName || 'กลุ่มคลังสินค้า KASA'}" (Group ID: ${gId})`
         : `ได้รับข้อความ "${msgText}" จาก ${customUserName || 'ลูกค้า'} (User ID: ${uId}) ผ่านแชตส่วนตัว`;
     } else if (evType === 'follow') {
-      detailMsg = `👤 ${customUserName || 'ผู้ใช้งานใหม่'} เพิ่มเพื่อนกับ LINE Official Account (User ID: ${uId})`;
+      const prof = syntheticEvent._simulatedProfile;
+      const displayName = customUserName || (prof ? prof.name : 'ผู้ใช้งานใหม่');
+      detailMsg = `👤 คุณ "${displayName}" ได้กดติดตาม / เพิ่มเพื่อนกับ LINE Official Account เรียบร้อยแล้ว`;
     }
+
+    const prof = syntheticEvent._simulatedProfile;
+    const simPic = prof ? prof.pic : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=200';
+    const simName = customUserName || (prof ? prof.name : (uId ? `คุณสมคิด (ID: ${uId.slice(-6)})` : undefined));
+    const simStatus = prof ? prof.status : 'เพิ่มเพื่อนใหม่';
 
     const createdLog: LineWebhookLog = {
       id: `sim-${now}`,
@@ -411,8 +471,9 @@ async function startServer() {
       eventType: evType,
       sourceType: src.type,
       userId: uId,
-      userName: customUserName || (uId ? `คุณสมคิด (ID: ${uId.slice(-6)})` : undefined),
-      userPictureUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=150',
+      userName: simName,
+      userPictureUrl: simPic,
+      statusMessage: simStatus,
       groupId: gId,
       groupName: customGroupName || (gId ? 'กลุ่มคลังสินค้า KASA' : undefined),
       groupPictureUrl: gId ? 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&q=80&w=150' : undefined,
@@ -428,6 +489,430 @@ async function startServer() {
     if (webhookLogs.length > 500) webhookLogs.pop();
 
     res.json({ success: true, log: createdLog });
+  });
+
+  // 6. POST /api/line/sync-config (Sync client LINE token to backend memory)
+  app.post('/api/line/sync-config', (req, res) => {
+    const { channelAccessToken } = req.body;
+    if (channelAccessToken && typeof channelAccessToken === 'string') {
+      activeLineChannelAccessToken = channelAccessToken.trim();
+    }
+    res.json({
+      success: true,
+      hasToken: Boolean(activeLineChannelAccessToken),
+      message: 'ซิงค์ Access Token ไปยัง Backend สำเร็จ'
+    });
+  });
+
+  // 7. POST /api/line/fetch-profile (Fetch or refresh profile for a specific User ID from LINE API)
+  app.post('/api/line/fetch-profile', async (req, res) => {
+    try {
+      const { userId, channelAccessToken, groupId } = req.body;
+      const token = (channelAccessToken && channelAccessToken.trim()) || activeLineChannelAccessToken || process.env.LINE_CHANNEL_ACCESS_TOKEN;
+
+      if (!userId) {
+        return res.status(400).json({ success: false, message: 'กรุณาระบุ User ID' });
+      }
+
+      if (token) {
+        activeLineChannelAccessToken = token;
+      }
+
+      if (!token) {
+        return res.status(400).json({
+          success: false,
+          message: 'ไม่พบ LINE Channel Access Token กรุณาระบุ Token ในแท็บ "ตั้งค่า Messaging API"'
+        });
+      }
+
+      const profile = await tryFetchLineProfile(userId, token, groupId);
+      if (!profile) {
+        return res.status(404).json({
+          success: false,
+          message: `ไม่สามารถดึงโปรไฟล์จาก LINE API ได้ (อาจเกิดจาก Token ไม่ถูกต้อง หรือผู้ใช้ไม่ได้เป็นเพื่อนกับบอท) User ID: ${userId}`
+        });
+      }
+
+      // Update matching logs in memory
+      let updatedCount = 0;
+      for (const log of webhookLogs) {
+        if (log.userId === userId) {
+          if (profile.displayName) log.userName = profile.displayName;
+          if (profile.pictureUrl) log.userPictureUrl = profile.pictureUrl;
+          if (profile.statusMessage) log.statusMessage = profile.statusMessage;
+          if (log.eventType === 'follow' && profile.displayName) {
+            log.details = `👤 คุณ "${profile.displayName}" ได้กดติดตาม / เพิ่มเพื่อนกับ LINE Official Account เรียบร้อยแล้ว`;
+          } else if (log.eventType === 'message' && profile.displayName && log.messageText) {
+            log.details = `ได้รับข้อความ "${log.messageText}" จากคุณ "${profile.displayName}"`;
+          }
+          updatedCount++;
+        }
+      }
+
+      res.json({
+        success: true,
+        profile,
+        updatedCount,
+        message: `ดึงข้อมูลโปรไฟล์ของ "${profile.displayName || userId}" สำเร็จ (${updatedCount} รายการอัปเดต)`
+      });
+    } catch (err: any) {
+      console.error('Error fetching LINE profile:', err);
+      res.status(500).json({ success: false, message: err.message || 'Internal Server Error' });
+    }
+  });
+
+  // 8. POST /api/line/update-log-user (Manually set custom name/picture for a user in logs)
+  app.post('/api/line/update-log-user', (req, res) => {
+    const { userId, userName, userPictureUrl, statusMessage } = req.body;
+    if (!userId) {
+      return res.status(400).json({ success: false, message: 'User ID is required' });
+    }
+
+    let updatedCount = 0;
+    for (const log of webhookLogs) {
+      if (log.userId === userId) {
+        if (userName) log.userName = userName;
+        if (userPictureUrl !== undefined) log.userPictureUrl = userPictureUrl;
+        if (statusMessage !== undefined) log.statusMessage = statusMessage;
+        if (log.eventType === 'follow' && userName) {
+          log.details = `👤 คุณ "${userName}" ได้กดติดตาม / เพิ่มเพื่อนกับ LINE Official Account เรียบร้อยแล้ว`;
+        }
+        updatedCount++;
+      }
+    }
+
+    res.json({
+      success: true,
+      updatedCount,
+      message: `อัปเดตข้อมูลผู้ใช้สำหรับ User ID ${userId} สำเร็จ (${updatedCount} รายการ)`
+    });
+  });
+
+  // 9. GET /api/line/cron-ping (For cron-job.org or UptimeRobot to keep Render awake 100% free)
+  app.get('/api/line/cron-ping', (req, res) => {
+    res.json({
+      status: 'ok',
+      uptime: process.uptime(),
+      time: new Date().toISOString(),
+      service: 'KASA WMS Server',
+      message: 'Render Free Tier kept awake successfully. Zero cold start.'
+    });
+  });
+
+  // 7. POST /api/line/notify (Send Push Message to LINE Group or User)
+  app.post('/api/line/notify', async (req, res) => {
+    try {
+      const {
+        channelAccessToken,
+        targetId,
+        type = 'test',
+        title,
+        details,
+        data = {}
+      } = req.body;
+
+      const now = new Date();
+      const timeStr = `${now.toLocaleDateString('th-TH')} ${now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น.`;
+
+      // Define themes based on notification type
+      let headerColor = '#7c3aed'; // Purple
+      let headerTitle = title || '🔔 แจ้งเตือนจากระบบ KASA WMS';
+      let badgeText = 'แจ้งเตือน';
+
+      if (type === 'inbound') {
+        headerColor = '#16a34a'; // Green
+        headerTitle = title || '📦 รับเข้าสินค้าสำเร็จ (INBOUND)';
+        badgeText = 'รับเข้าคลัง';
+      } else if (type === 'outbound') {
+        headerColor = '#0284c7'; // Sky Blue
+        headerTitle = title || '🚚 เบิกจ่ายสินค้าสำเร็จ (OUTBOUND)';
+        badgeText = 'ส่งมอบ/เบิกจ่าย';
+      } else if (type === 'low_stock') {
+        headerColor = '#dc2626'; // Red
+        headerTitle = title || '⚠️ สินค้าใกล้หมดสต๊อก (LOW STOCK)';
+        badgeText = 'เตือนสต๊อกต่ำ';
+      }
+
+      // Build item rows for Flex message
+      const itemsList = Array.isArray(data.items) && data.items.length > 0
+        ? data.items
+        : (data.productName ? [{
+            productName: data.productName,
+            productCode: data.productCode || '-',
+            quantity: data.quantity || 1,
+            unit: data.unit || 'หน่วย',
+            zoneName: data.zoneName || '-',
+            condition: data.condition || 'GOOD'
+          }] : []);
+
+      const itemComponents = itemsList.slice(0, 8).map((item: any, idx: number) => ({
+        type: 'box',
+        layout: 'vertical',
+        margin: 'sm',
+        contents: [
+          {
+            type: 'box',
+            layout: 'horizontal',
+            contents: [
+              {
+                type: 'text',
+                text: `${idx + 1}. ${item.productName}`,
+                weight: 'bold',
+                size: 'sm',
+                color: '#1e293b',
+                flex: 4,
+                wrap: true
+              },
+              {
+                type: 'text',
+                text: `${Number(item.quantity).toLocaleString()} ${item.unit}`,
+                weight: 'bold',
+                size: 'sm',
+                color: headerColor,
+                align: 'end',
+                flex: 2
+              }
+            ]
+          },
+          {
+            type: 'box',
+            layout: 'horizontal',
+            contents: [
+              {
+                type: 'text',
+                text: `รหัส: ${item.productCode} | โซน: ${item.zoneName || '-'}`,
+                size: 'xs',
+                color: '#64748b',
+                flex: 4
+              },
+              {
+                type: 'text',
+                text: item.condition === 'DAMAGED' ? '❌ ชำรุด' : '✅ ปกติ',
+                size: 'xs',
+                color: item.condition === 'DAMAGED' ? '#ef4444' : '#10b981',
+                align: 'end',
+                flex: 2
+              }
+            ]
+          }
+        ]
+      }));
+
+      // Flex Message payload
+      const flexMessage = {
+        type: 'flex',
+        altText: `[KASA WMS] ${headerTitle}: ${data.transactionCode || ''}`,
+        contents: {
+          type: 'bubble',
+          size: 'mega',
+          header: {
+            type: 'box',
+            layout: 'vertical',
+            backgroundColor: headerColor,
+            paddingAll: '16px',
+            contents: [
+              {
+                type: 'box',
+                layout: 'horizontal',
+                contents: [
+                  {
+                    type: 'text',
+                    text: headerTitle,
+                    weight: 'bold',
+                    color: '#ffffff',
+                    size: 'md',
+                    flex: 4,
+                    wrap: true
+                  },
+                  {
+                    type: 'text',
+                    text: badgeText,
+                    color: '#ffffff',
+                    size: 'xxs',
+                    align: 'end',
+                    flex: 2
+                  }
+                ]
+              },
+              data.transactionCode ? {
+                type: 'text',
+                text: `เลขที่เอกสาร: ${data.transactionCode}`,
+                color: '#ffffffcc',
+                size: 'xs',
+                margin: 'xs'
+              } : { type: 'filler' }
+            ]
+          },
+          body: {
+            type: 'box',
+            layout: 'vertical',
+            paddingAll: '16px',
+            contents: [
+              {
+                type: 'box',
+                layout: 'vertical',
+                spacing: 'xs',
+                contents: [
+                  {
+                    type: 'box',
+                    layout: 'horizontal',
+                    contents: [
+                      { type: 'text', text: '🕒 วันเวลา:', size: 'xs', color: '#64748b', flex: 2 },
+                      { type: 'text', text: timeStr, size: 'xs', color: '#1e293b', flex: 4, weight: 'bold' }
+                    ]
+                  },
+                  data.operatorName ? {
+                    type: 'box',
+                    layout: 'horizontal',
+                    contents: [
+                      { type: 'text', text: '👤 ผู้ทำรายการ:', size: 'xs', color: '#64748b', flex: 2 },
+                      { type: 'text', text: data.operatorName, size: 'xs', color: '#1e293b', flex: 4 }
+                    ]
+                  } : { type: 'filler' },
+                  data.partnerName ? {
+                    type: 'box',
+                    layout: 'horizontal',
+                    contents: [
+                      { type: 'text', text: type === 'inbound' ? '🏢 แหล่งที่มา/คู่ค้า:' : '🚚 ปลายทาง/ลูกค้า:', size: 'xs', color: '#64748b', flex: 2 },
+                      { type: 'text', text: data.partnerName, size: 'xs', color: '#1e293b', flex: 4 }
+                    ]
+                  } : { type: 'filler' }
+                ]
+              },
+              { type: 'separator', margin: 'md' },
+              {
+                type: 'text',
+                text: '📋 รายการสินค้า:',
+                weight: 'bold',
+                size: 'xs',
+                color: '#334155',
+                margin: 'md'
+              },
+              ...itemComponents,
+              data.note ? {
+                type: 'box',
+                layout: 'vertical',
+                margin: 'md',
+                backgroundColor: '#f8fafc',
+                paddingAll: '8px',
+                cornerRadius: '6px',
+                contents: [
+                  { type: 'text', text: `📝 หมายเหตุ: ${data.note}`, size: 'xs', color: '#475569', wrap: true }
+                ]
+              } : { type: 'filler' }
+            ]
+          },
+          footer: {
+            type: 'box',
+            layout: 'vertical',
+            spacing: 'sm',
+            paddingAll: '12px',
+            backgroundColor: '#f1f5f9',
+            contents: [
+              {
+                type: 'button',
+                style: 'primary',
+                height: 'sm',
+                color: headerColor,
+                action: {
+                  type: 'uri',
+                  label: '🔍 เปิดดูระบบคลังสินค้า (WMS)',
+                  uri: 'https://kasa-wms.onrender.com'
+                }
+              }
+            ]
+          }
+        }
+      };
+
+      const finalToken = channelAccessToken || activeLineChannelAccessToken || process.env.LINE_CHANNEL_ACCESS_TOKEN;
+      if (finalToken) activeLineChannelAccessToken = finalToken;
+      const finalTarget = targetId || process.env.LINE_TARGET_ID;
+
+      // If token and target are provided, send live LINE Push Message
+      if (finalToken && finalTarget) {
+        const lineResponse = await fetch('https://api.line.me/v2/bot/message/push', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${finalToken}`
+          },
+          body: JSON.stringify({
+            to: finalTarget,
+            messages: [flexMessage]
+          })
+        });
+
+        const lineData = await lineResponse.json().catch(() => ({}));
+
+        if (!lineResponse.ok) {
+          const errMsg = lineData.message || `LINE API responded with ${lineResponse.status}`;
+          webhookLogs.unshift({
+            id: `push-err-${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            eventType: 'message',
+            sourceType: 'system',
+            groupId: finalTarget.startsWith('C') ? finalTarget : undefined,
+            userId: finalTarget.startsWith('U') ? finalTarget : undefined,
+            details: `❌ ส่งแจ้งเตือน LINE ล้มเหลว: ${errMsg}`,
+            status: 'ERROR',
+            rawPayload: lineData
+          });
+          if (webhookLogs.length > 500) webhookLogs.pop();
+
+          return res.status(400).json({
+            success: false,
+            message: `LINE API Error: ${errMsg}`,
+            error: lineData
+          });
+        }
+
+        // Successfully sent
+        webhookLogs.unshift({
+          id: `push-ok-${Date.now()}`,
+          timestamp: new Date().toISOString(),
+          eventType: 'message',
+          sourceType: finalTarget.startsWith('C') ? 'group' : 'user',
+          groupId: finalTarget.startsWith('C') ? finalTarget : undefined,
+          userId: finalTarget.startsWith('U') ? finalTarget : undefined,
+          details: `🚀 ส่งการแจ้งเตือน "${headerTitle}" ไปยัง LINE เรียบร้อยแล้ว (Target: ${finalTarget})`,
+          status: 'SUCCESS',
+          rawPayload: flexMessage
+        });
+        if (webhookLogs.length > 500) webhookLogs.pop();
+
+        return res.json({
+          success: true,
+          message: 'ส่งการแจ้งเตือนเข้า LINE สำเร็จเรียบร้อย!',
+          targetId: finalTarget
+        });
+      } else {
+        // Log simulated push
+        webhookLogs.unshift({
+          id: `push-sim-${Date.now()}`,
+          timestamp: new Date().toISOString(),
+          eventType: 'message',
+          sourceType: 'system',
+          details: `📱 [จำลองแจ้งเตือน] ${headerTitle} (ยังไม่ได้ใส่ Channel Access Token หรือ Target ID ในการตั้งค่า)`,
+          status: 'INFO',
+          rawPayload: flexMessage
+        });
+        if (webhookLogs.length > 500) webhookLogs.pop();
+
+        return res.json({
+          success: true,
+          simulated: true,
+          message: 'บันทึกการแจ้งเตือนในประวัติเรียบร้อย (หากต้องการส่งเข้าห้องแชต LINE จริง กรุณากรอก Channel Access Token และ Group ID ในหน้าตั้งค่า)',
+          flexPreview: flexMessage
+        });
+      }
+    } catch (err: any) {
+      console.error('Push notification error:', err);
+      return res.status(500).json({
+        success: false,
+        message: err.message || 'Internal Server Error'
+      });
+    }
   });
 
   // Vite middleware for development

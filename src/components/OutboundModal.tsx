@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { ProductCondition, Product } from '../types';
-import { X, ArrowUpRight, AlertCircle, CheckCircle2, Plus, Trash2, Search, QrCode } from 'lucide-react';
+import { X, ArrowUpRight, AlertCircle, CheckCircle2, Plus, Trash2, Search, QrCode, Camera, Printer, Send } from 'lucide-react';
+import { CameraBarcodeScanner } from './CameraBarcodeScanner';
+import { PrintDocumentModal, PrintDocumentData } from './PrintDocumentModal';
 
 interface OutboundModalProps {
   isOpen: boolean;
@@ -18,7 +20,7 @@ interface OutboundRow {
 }
 
 export const OutboundModal: React.FC<OutboundModalProps> = ({ isOpen, onClose }) => {
-  const { products, warehouses, inventory, currentUser, addOutbound, t } = useApp();
+  const { products, warehouses, inventory, currentUser, addOutbound, lineConfig, t } = useApp();
 
   const [dispatcherName, setDispatcherName] = useState<string>(`${currentUser.firstName} ${currentUser.lastName}`);
   const [recorderName, setRecorderName] = useState<string>(`${currentUser.firstName} ${currentUser.lastName}`);
@@ -43,6 +45,11 @@ export const OutboundModal: React.FC<OutboundModalProps> = ({ isOpen, onClose })
     }
   ]);
 
+  // Camera & Print states
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [isPrintOpen, setIsPrintOpen] = useState(false);
+  const [completedDocData, setCompletedDocData] = useState<PrintDocumentData | null>(null);
+
   // QR Code / Quick Product Search State
   const [qrInput, setQrInput] = useState('');
   const [qrFeedback, setQrFeedback] = useState<string>('');
@@ -51,6 +58,38 @@ export const OutboundModal: React.FC<OutboundModalProps> = ({ isOpen, onClose })
   const [successMsg, setSuccessMsg] = useState<string>('');
 
   if (!isOpen) return null;
+
+  // Handle Scan from Camera
+  const handleCameraScanned = (decodedText: string) => {
+    setQrFeedback('');
+    const queryStr = decodedText.trim().toLowerCase();
+    const matchedProduct = products.find(
+      p => p.code.toLowerCase() === queryStr || p.id === decodedText.trim() || p.name.toLowerCase().includes(queryStr)
+    );
+
+    if (matchedProduct) {
+      const existingIdx = items.findIndex(i => i.productId === matchedProduct.id);
+      if (existingIdx >= 0) {
+        setItems(prev => prev.map((item, idx) => idx === existingIdx ? { ...item, quantity: item.quantity + 50 } : item));
+        setQrFeedback(`📷 สแกนติดสำเร็จ: เพิ่มจำนวนให้ [${matchedProduct.code}] ${matchedProduct.name} (+50)`);
+      } else {
+        setItems(prev => [
+          ...prev,
+          {
+            id: `row-${Date.now()}`,
+            productId: matchedProduct.id,
+            quantity: 50,
+            condition: 'GOOD',
+            warehouseId: defaultWh,
+            zoneId: defaultZone
+          }
+        ]);
+        setQrFeedback(`📷 สแกนติดสำเร็จ: เพิ่มสินค้า [${matchedProduct.code}] ${matchedProduct.name} เข้าในรายการแล้ว`);
+      }
+    } else {
+      setQrFeedback(`📷 สแกนพบบาร์โค้ด "${decodedText}" แต่ยังไม่มีในระบบแคตตาล็อก`);
+    }
+  };
 
   // Helper to calculate available stock in chosen WH & Zone
   const getAvailableStock = (prodId: string, whId: string, zId: string, cond: ProductCondition) => {
@@ -208,11 +247,59 @@ export const OutboundModal: React.FC<OutboundModalProps> = ({ isOpen, onClose })
     });
 
     if (successCount > 0 && failedCount === 0) {
-      setSuccessMsg(`บันทึกส่งออกสินค้าสำเร็จจำนวน ${successCount} รายการ!`);
-      setTimeout(() => {
-        setSuccessMsg('');
-        onClose();
-      }, 1300);
+      const docNo = `OUT-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(100 + Math.random() * 900)}`;
+      const printData: PrintDocumentData = {
+        type: 'outbound',
+        documentNo: docNo,
+        date,
+        time,
+        operatorName: dispatcherName.trim(),
+        recorderName: recorderName.trim(),
+        partnerName: destination,
+        referenceNo: details.slice(0, 30),
+        note: details,
+        items: items.map(row => {
+          const p = products.find(x => x.id === row.productId);
+          const w = warehouses.find(x => x.id === row.warehouseId);
+          const z = w?.zones.find(x => x.id === row.zoneId);
+          return {
+            productCode: p?.code || '',
+            productName: p?.name || '',
+            chemicalFormula: p?.chemicalFormula,
+            container: p?.container,
+            size: p?.size,
+            quantity: row.quantity,
+            unit: p?.unit || 'หน่วย',
+            warehouseName: w?.name || '',
+            zoneName: z?.name || '',
+            condition: row.condition
+          };
+        })
+      };
+
+      setCompletedDocData(printData);
+      setSuccessMsg(`🎉 บันทึกส่งออกสินค้าสำเร็จจำนวน ${successCount} รายการ!`);
+
+      // Automatic LINE Notification
+      if (lineConfig.notifyOutbound !== false) {
+        fetch('/api/line/notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            channelAccessToken: lineConfig.channelAccessToken,
+            targetId: lineConfig.lineBotGroupId,
+            type: 'outbound',
+            title: '🚚 เบิกจ่ายสินค้าสำเร็จ (OUTBOUND)',
+            data: {
+              transactionCode: docNo,
+              operatorName: dispatcherName.trim(),
+              partnerName: destination,
+              note: details,
+              items: printData.items
+            }
+          })
+        }).catch(err => console.warn('LINE notification dispatch failed:', err));
+      }
     } else {
       setErrorMsg(`บันทึกสำเร็จ ${successCount} รายการ, เกิดข้อผิดพลาด ${failedCount} รายการ`);
     }
@@ -291,6 +378,15 @@ export const OutboundModal: React.FC<OutboundModalProps> = ({ isOpen, onClose })
                 <Plus className="w-3.5 h-3.5" />
                 <span>เพิ่มสินค้า</span>
               </button>
+              <button
+                type="button"
+                onClick={() => setIsCameraOpen(true)}
+                className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold shadow-2xs transition-colors shrink-0 flex items-center gap-1.5 cursor-pointer"
+                title="เปิดกล้องมือถือหรือเว็บแคมเพื่อสแกนบาร์โค้ดสด"
+              >
+                <Camera className="w-4 h-4 text-blue-400" />
+                <span>เปิดกล้องสแกน</span>
+              </button>
             </div>
             {qrFeedback && (
               <p className={`text-[11px] font-medium ${qrFeedback.includes('ไม่พบ') ? 'text-rose-600' : 'text-blue-700'}`}>
@@ -298,6 +394,41 @@ export const OutboundModal: React.FC<OutboundModalProps> = ({ isOpen, onClose })
               </p>
             )}
           </div>
+
+          {/* Success Banner with Direct Print Button if Saved */}
+          {completedDocData && (
+            <div className="p-4 bg-blue-500/10 border-2 border-blue-500 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-600 text-white rounded-lg">
+                  <CheckCircle2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-blue-950">บันทึกส่งออกสินค้าสำเร็จเรียบร้อย!</h4>
+                  <p className="text-xs text-blue-800">
+                    เลขที่เอกสาร: <span className="font-mono font-bold">{completedDocData.documentNo}</span> &bull; {lineConfig.notifyOutbound !== false ? '📱 ส่งการแจ้งเตือนเข้า LINE เรียบร้อย' : ''}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={() => setIsPrintOpen(true)}
+                  className="flex-1 sm:flex-none px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 shadow-md cursor-pointer transition-all"
+                >
+                  <Printer className="w-4 h-4" />
+                  สั่งพิมพ์ใบส่งของ A4
+                </button>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-semibold transition-colors"
+                >
+                  เสร็จสิ้น (ปิด)
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* General Outbound Metadata */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
@@ -528,7 +659,48 @@ export const OutboundModal: React.FC<OutboundModalProps> = ({ isOpen, onClose })
               รวม <strong className="text-slate-900 font-bold">{items.length}</strong> รายการสินค้า
             </span>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const docNo = `OUT-PREVIEW-${Date.now().toString().slice(-4)}`;
+                  const previewData: PrintDocumentData = {
+                    type: 'outbound',
+                    documentNo: docNo,
+                    date,
+                    time,
+                    operatorName: dispatcherName.trim() || 'ผู้ส่งสินค้า',
+                    recorderName: recorderName.trim() || 'ผู้บันทึก',
+                    partnerName: destination,
+                    referenceNo: details.slice(0, 30),
+                    note: details,
+                    items: items.map(row => {
+                      const p = products.find(x => x.id === row.productId);
+                      const w = warehouses.find(x => x.id === row.warehouseId);
+                      const z = w?.zones.find(x => x.id === row.zoneId);
+                      return {
+                        productCode: p?.code || '',
+                        productName: p?.name || '',
+                        chemicalFormula: p?.chemicalFormula,
+                        container: p?.container,
+                        size: p?.size,
+                        quantity: row.quantity,
+                        unit: p?.unit || 'หน่วย',
+                        warehouseName: w?.name || '',
+                        zoneName: z?.name || '',
+                        condition: row.condition
+                      };
+                    })
+                  };
+                  setCompletedDocData(previewData);
+                  setIsPrintOpen(true);
+                }}
+                className="px-3 py-1.5 border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                title="เปิดดูตัวอย่างใบสั่งจ่าย / ใบส่งสินค้า A4 และสั่งพิมพ์"
+              >
+                <Printer className="w-3.5 h-3.5 text-slate-500" />
+                <span>พิมพ์ใบส่งของ A4</span>
+              </button>
               <button
                 type="button"
                 onClick={onClose}
@@ -538,7 +710,7 @@ export const OutboundModal: React.FC<OutboundModalProps> = ({ isOpen, onClose })
               </button>
               <button
                 type="submit"
-                className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs font-medium shadow-2xs transition-colors"
+                className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
               >
                 บันทึกส่งออก ({items.length} รายการ)
               </button>
@@ -548,6 +720,22 @@ export const OutboundModal: React.FC<OutboundModalProps> = ({ isOpen, onClose })
         </form>
 
       </div>
+
+      {/* Live Camera Barcode Scanner Modal */}
+      <CameraBarcodeScanner
+        isOpen={isCameraOpen}
+        onClose={() => setIsCameraOpen(false)}
+        onScan={handleCameraScanned}
+        title="สแกนบาร์โค้ดส่งออกสินค้า"
+        subtitle="หันกล้องไปที่บาร์โค้ดสินค้าเคมีภัณฑ์เพื่อเพิ่มเข้าใบส่งสินค้า"
+      />
+
+      {/* Printable A4 Document Modal */}
+      <PrintDocumentModal
+        isOpen={isPrintOpen}
+        onClose={() => setIsPrintOpen(false)}
+        docData={completedDocData}
+      />
     </div>
   );
 };

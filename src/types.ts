@@ -165,6 +165,7 @@ export interface LineWebhookLog {
   userId?: string;
   userName?: string;
   userPictureUrl?: string;
+  statusMessage?: string;
   groupId?: string;
   groupName?: string;
   groupPictureUrl?: string;
