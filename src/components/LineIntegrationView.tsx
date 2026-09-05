@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import { LineWebhookLog } from '../types';
+import { QRCodeSVG } from 'qrcode.react';
 import { 
   MessageSquare, 
   Smartphone, 
@@ -28,14 +29,18 @@ import {
   Share2,
   Info,
   Clock,
-  AlertTriangle
+  AlertTriangle,
+  Link,
+  QrCode,
+  Globe,
+  Download
 } from 'lucide-react';
 
 export const LineIntegrationView: React.FC = () => {
   const { lineConfig, updateLineConfig, triggerLineTestBroadcast, products, t } = useApp();
 
   // Active view tab inside Line Integration
-  const [activeTab, setActiveTab] = useState<'logs' | 'setup' | 'config' | 'mobile'>('logs');
+  const [activeTab, setActiveTab] = useState<'liff-links' | 'logs' | 'setup' | 'config' | 'mobile'>('liff-links');
 
   // Credentials config state
   const [channelId, setChannelId] = useState(lineConfig.channelId);
@@ -43,6 +48,10 @@ export const LineIntegrationView: React.FC = () => {
   const [accessToken, setAccessToken] = useState(lineConfig.channelAccessToken);
   const [liffId, setLiffId] = useState(lineConfig.liffId);
   const [groupId, setGroupId] = useState(lineConfig.lineBotGroupId);
+  const [customDeployedUrl, setCustomDeployedUrl] = useState(lineConfig.customDeployedUrl || '');
+  const [selectedUrlSource, setSelectedUrlSource] = useState<'shared' | 'current' | 'custom'>(
+    lineConfig.customDeployedUrl ? 'custom' : 'shared'
+  );
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
   const [testSuccess, setTestSuccess] = useState(false);
 
@@ -60,11 +69,31 @@ export const LineIntegrationView: React.FC = () => {
   const [simGroupName, setSimGroupName] = useState('กลุ่มคลังสินค้า & ฝ่ายจัดส่ง KASA');
   const [simUserName, setSimUserName] = useState('สมเกียรติ สิทธิชัย (เจ้าหน้าที่คลัง)');
 
-  // URLs
+  // URLs resolution
   const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+  const defaultSharedDomain = 'https://ais-pre-4pm2czbdbjt7rg6uuwd3ge-637997801240.asia-east1.run.app';
+
+  // Base URL selection
+  let activeBaseDomain = defaultSharedDomain;
+  if (selectedUrlSource === 'current' && currentOrigin) {
+    activeBaseDomain = currentOrigin;
+  } else if (selectedUrlSource === 'custom' && customDeployedUrl.trim()) {
+    activeBaseDomain = customDeployedUrl.trim().replace(/\/+$/, '');
+  }
+
+  // Ensure protocol
+  if (activeBaseDomain && !activeBaseDomain.startsWith('http://') && !activeBaseDomain.startsWith('https://')) {
+    activeBaseDomain = `https://${activeBaseDomain}`;
+  }
+
+  const generatedWebhookUrl = `${activeBaseDomain}/api/line/webhook`;
+  const generatedLiffEndpointUrl = `${activeBaseDomain}?mode=liff`;
+  const cleanLiffId = (liffId || '').trim();
+  const generatedLiffUrl = cleanLiffId ? `https://liff.line.me/${cleanLiffId}` : `https://liff.line.me/2001928374-xY9zL4a1`;
+
   const currentWebhookUrl = `${currentOrigin}/api/line/webhook`;
-  const sharedWebhookUrl = 'https://ais-pre-4pm2czbdbjt7rg6uuwd3ge-637997801240.asia-east1.run.app/api/line/webhook';
-  const liffUrl = `https://liff.line.me/${liffId || '2001928374-xY9zL4a1'}`;
+  const sharedWebhookUrl = `${defaultSharedDomain}/api/line/webhook`;
+  const liffUrl = generatedLiffUrl;
 
   // Fetch logs from Backend Express server
   const fetchWebhookLogs = useCallback(async () => {
@@ -171,6 +200,21 @@ export const LineIntegrationView: React.FC = () => {
     alert(`นำ Group ID "${targetGid}" (${groupTitle || 'กลุ่ม LINE'}) ไปตั้งเป็นปลายทางการแจ้งเตือนเรียบร้อยแล้ว!`);
   };
 
+  const handleSaveCustomDomain = (url: string) => {
+    const cleaned = url.trim();
+    setCustomDeployedUrl(cleaned);
+    setSelectedUrlSource('custom');
+    updateLineConfig({ customDeployedUrl: cleaned });
+    setTestSuccess(true);
+    setTimeout(() => setTestSuccess(false), 2500);
+  };
+
+  const handleQuickUpdateLiffId = (newId: string) => {
+    const cleaned = newId.trim();
+    setLiffId(cleaned);
+    updateLineConfig({ liffId: cleaned });
+  };
+
   const handleSaveConfig = (e: React.FormEvent) => {
     e.preventDefault();
     updateLineConfig({
@@ -178,6 +222,7 @@ export const LineIntegrationView: React.FC = () => {
       channelSecret,
       channelAccessToken: accessToken,
       liffId,
+      customDeployedUrl: customDeployedUrl.trim(),
       lineBotGroupId: groupId,
       webhookStatus: 'CONNECTED'
     });
@@ -246,64 +291,102 @@ export const LineIntegrationView: React.FC = () => {
           </div>
         </div>
 
-        {/* Webhook Endpoint Fast-Copy Card */}
-        <div className="mt-5 pt-5 border-t border-slate-800/80 grid grid-cols-1 md:grid-cols-2 gap-3">
-          {/* Shared Public Webhook URL */}
-          <div className="p-3.5 bg-slate-950/70 border border-slate-800 rounded-xl flex items-center justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 text-[11px] font-semibold text-emerald-400 mb-1">
+        {/* Webhook & LIFF Fast-Copy Grid */}
+        <div className="mt-5 pt-5 border-t border-slate-800/80 grid grid-cols-1 md:grid-cols-3 gap-3">
+          {/* 1. Webhook URL */}
+          <div className="p-3.5 bg-slate-950/70 border border-slate-800 rounded-xl flex flex-col justify-between gap-2">
+            <div>
+              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-400 mb-1">
                 <Share2 className="w-3.5 h-3.5" />
-                <span>ลิงก์ Webhook สำหรับใส่ใน LINE Developers (แนะนำ):</span>
+                <span>1. Webhook URL (Messaging API):</span>
               </div>
               <p className="font-mono text-xs text-slate-200 truncate select-all">
-                {sharedWebhookUrl}
+                {generatedWebhookUrl}
               </p>
             </div>
-            <button
-              onClick={() => handleCopy(sharedWebhookUrl, 'shared')}
-              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-medium shrink-0 flex items-center gap-1.5 transition-all"
-            >
-              {copiedUrl === 'shared' ? (
-                <>
-                  <Check className="w-3.5 h-3.5 text-emerald-400" />
-                  <span className="text-emerald-400">คัดลอกแล้ว</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="w-3.5 h-3.5 text-slate-400" />
-                  <span>คัดลอก URL</span>
-                </>
-              )}
-            </button>
+            <div className="flex items-center justify-between pt-1 border-t border-slate-800/60">
+              <span className="text-[10px] text-slate-400">สำหรับรับ Event ข้อความ</span>
+              <button
+                onClick={() => handleCopy(generatedWebhookUrl, 'top-webhook')}
+                className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-medium flex items-center gap-1 transition-all"
+              >
+                {copiedUrl === 'top-webhook' ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="text-emerald-400">คัดลอกแล้ว</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5 text-slate-400" />
+                    <span>คัดลอก URL</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
 
-          {/* Current Domain Webhook URL */}
-          <div className="p-3.5 bg-slate-950/70 border border-slate-800 rounded-xl flex items-center justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 text-[11px] font-semibold text-sky-400 mb-1">
+          {/* 2. LIFF Endpoint URL */}
+          <div className="p-3.5 bg-slate-950/70 border border-slate-800 rounded-xl flex flex-col justify-between gap-2">
+            <div>
+              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-sky-400 mb-1">
                 <ExternalLink className="w-3.5 h-3.5" />
-                <span>ลิงก์บนโดเมนปัจจุบัน (Direct Origin):</span>
+                <span>2. LIFF Endpoint URL (ตอนสร้าง LIFF):</span>
               </div>
               <p className="font-mono text-xs text-slate-200 truncate select-all">
-                {currentWebhookUrl}
+                {generatedLiffEndpointUrl}
               </p>
             </div>
-            <button
-              onClick={() => handleCopy(currentWebhookUrl, 'current')}
-              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-medium shrink-0 flex items-center gap-1.5 transition-all"
-            >
-              {copiedUrl === 'current' ? (
-                <>
-                  <Check className="w-3.5 h-3.5 text-emerald-400" />
-                  <span className="text-emerald-400">คัดลอกแล้ว</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="w-3.5 h-3.5 text-slate-400" />
-                  <span>คัดลอก URL</span>
-                </>
-              )}
-            </button>
+            <div className="flex items-center justify-between pt-1 border-t border-slate-800/60">
+              <span className="text-[10px] text-slate-400">ใส่ในช่อง Endpoint URL</span>
+              <button
+                onClick={() => handleCopy(generatedLiffEndpointUrl, 'top-liff-endpoint')}
+                className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-medium flex items-center gap-1 transition-all"
+              >
+                {copiedUrl === 'top-liff-endpoint' ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="text-emerald-400">คัดลอกแล้ว</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5 text-slate-400" />
+                    <span>คัดลอก URL</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* 3. LIFF URL For Staff */}
+          <div className="p-3.5 bg-slate-950/70 border border-slate-800 rounded-xl flex flex-col justify-between gap-2">
+            <div>
+              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-amber-400 mb-1">
+                <Smartphone className="w-3.5 h-3.5" />
+                <span>3. LIFF App URL (ส่งให้พนักงานคลิก):</span>
+              </div>
+              <p className="font-mono text-xs text-slate-200 truncate select-all">
+                {generatedLiffUrl}
+              </p>
+            </div>
+            <div className="flex items-center justify-between pt-1 border-t border-slate-800/60">
+              <span className="text-[10px] text-slate-400">เปิดในแอป LINE บนมือถือ</span>
+              <button
+                onClick={() => handleCopy(generatedLiffUrl, 'top-liff-app')}
+                className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-medium flex items-center gap-1 transition-all"
+              >
+                {copiedUrl === 'top-liff-app' ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="text-emerald-400">คัดลอกแล้ว</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5 text-slate-400" />
+                    <span>คัดลอก LIFF</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -326,6 +409,23 @@ export const LineIntegrationView: React.FC = () => {
       {/* Sub-Navigation Tabs */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-2">
         <div className="flex items-center gap-1.5 overflow-x-auto">
+          <button
+            onClick={() => setActiveTab('liff-links')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shrink-0 ${
+              activeTab === 'liff-links'
+                ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-500/20'
+                : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+            }`}
+          >
+            <Link className="w-3.5 h-3.5" />
+            <span>ลิงก์ Webhook & LINE LIFF สำเร็จรูป</span>
+            <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+              activeTab === 'liff-links' ? 'bg-emerald-800 text-emerald-100' : 'bg-emerald-100 text-emerald-800'
+            }`}>
+              แนะนำ
+            </span>
+          </button>
+
           <button
             onClick={() => setActiveTab('logs')}
             className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shrink-0 ${
@@ -405,6 +505,423 @@ export const LineIntegrationView: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* ================= TAB 0: WEBHOOK & LIFF READY-TO-USE LINKS ================= */}
+      {activeTab === 'liff-links' && (
+        <div className="space-y-6">
+          
+          {/* Domain Selection & Deployed URL Configurator */}
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+              <div>
+                <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                  <Globe className="w-4 h-4 text-blue-600" />
+                  <span>เลือกโดเมนที่คุณ Deploy สำหรับสร้างลิงก์ Webhook และ LIFF</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  ระบบจะคำนวณ Webhook URL และ LIFF Endpoint URL ให้ตรงกับโดเมนที่คุณเลือกโดยอัตโนมัติ
+                </p>
+              </div>
+
+              {testSuccess && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-xs font-bold animate-in fade-in">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>บันทึกโดเมนเรียบร้อยแล้ว</span>
+                </span>
+              )}
+            </div>
+
+            {/* Source Selector Radios */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+              <label 
+                className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
+                  selectedUrlSource === 'shared'
+                    ? 'border-emerald-500 bg-emerald-50/50 ring-1 ring-emerald-500'
+                    : 'border-slate-200 hover:border-slate-300 bg-slate-50/50'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="urlSource"
+                    checked={selectedUrlSource === 'shared'}
+                    onChange={() => setSelectedUrlSource('shared')}
+                    className="text-emerald-600"
+                  />
+                  <span className="font-bold text-slate-900">Cloud Run (Production URL)</span>
+                </div>
+                <p className="font-mono text-[11px] text-slate-500 mt-1 truncate">
+                  {defaultSharedDomain}
+                </p>
+                <span className="text-[10px] text-emerald-700 font-semibold mt-1 inline-block">
+                  ✓ พร้อมใช้งานทันที ไม่ต้องตั้งค่าเพิ่ม
+                </span>
+              </label>
+
+              <label 
+                className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
+                  selectedUrlSource === 'current'
+                    ? 'border-emerald-500 bg-emerald-50/50 ring-1 ring-emerald-500'
+                    : 'border-slate-200 hover:border-slate-300 bg-slate-50/50'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="urlSource"
+                    checked={selectedUrlSource === 'current'}
+                    onChange={() => setSelectedUrlSource('current')}
+                    className="text-emerald-600"
+                  />
+                  <span className="font-bold text-slate-900">โดเมนที่เปิดใช้งานอยู่ขณะนี้</span>
+                </div>
+                <p className="font-mono text-[11px] text-slate-500 mt-1 truncate">
+                  {currentOrigin || 'กำลังโหลด...'}
+                </p>
+                <span className="text-[10px] text-slate-500 mt-1 inline-block">
+                  (Direct Browser Origin)
+                </span>
+              </label>
+
+              <label 
+                className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
+                  selectedUrlSource === 'custom'
+                    ? 'border-emerald-500 bg-emerald-50/50 ring-1 ring-emerald-500'
+                    : 'border-slate-200 hover:border-slate-300 bg-slate-50/50'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="urlSource"
+                    checked={selectedUrlSource === 'custom'}
+                    onChange={() => setSelectedUrlSource('custom')}
+                    className="text-emerald-600"
+                  />
+                  <span className="font-bold text-slate-900">Custom Deployed Domain</span>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  (เช่น Deploy บน Vercel, Render, Cloudflare หรือโดเมนส่วนตัว)
+                </p>
+                <span className="text-[10px] text-blue-700 font-semibold mt-1 inline-block">
+                  พิมพ์ URL เองได้ด้านล่าง
+                </span>
+              </label>
+            </div>
+
+            {/* Custom URL Input Field */}
+            {selectedUrlSource === 'custom' && (
+              <div className="p-3.5 bg-blue-50/60 border border-blue-200 rounded-xl space-y-2">
+                <label className="block text-xs font-bold text-blue-950">
+                  ระบุ URL ของเว็บที่คุณ Deploy ผ่าน GitHub (เช่น https://kasa-wms.vercel.app):
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="url"
+                    value={customDeployedUrl}
+                    onChange={(e) => setCustomDeployedUrl(e.target.value)}
+                    placeholder="https://your-domain.vercel.app"
+                    className="flex-1 px-3 py-2 text-xs bg-white border border-blue-300 rounded-xl font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleSaveCustomDomain(customDeployedUrl)}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all shrink-0"
+                  >
+                    บันทึกโดเมน
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 3 Core Production Link Cards */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            
+            {/* Card 1: Webhook URL */}
+            <div className="bg-white p-5 rounded-2xl border border-emerald-200 shadow-2xs flex flex-col justify-between space-y-4">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-sm">
+                    1
+                  </span>
+                  <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 rounded-full text-[10px] font-bold">
+                    LINE Messaging API
+                  </span>
+                </div>
+
+                <div>
+                  <h4 className="text-sm font-bold text-slate-900">
+                    Webhook URL (สำหรับใส่ใน LINE OA)
+                  </h4>
+                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                    นำลิงก์นี้ไปใส่ในแท็บ <strong>Messaging API</strong> &gt; <strong>Webhook settings</strong> &gt; <strong>Webhook URL</strong> แล้วเปิด <strong>Use Webhook</strong>
+                  </p>
+                </div>
+
+                <div className="p-3 bg-slate-900 text-emerald-400 font-mono text-xs rounded-xl break-all select-all border border-slate-800">
+                  {generatedWebhookUrl}
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 space-y-2">
+                <button
+                  onClick={() => handleCopy(generatedWebhookUrl, 'card-webhook')}
+                  className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center justify-center gap-2 transition-all"
+                >
+                  {copiedUrl === 'card-webhook' ? (
+                    <>
+                      <Check className="w-4 h-4 text-white" />
+                      <span>คัดลอก Webhook URL แล้ว!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4" />
+                      <span>คัดลอก Webhook URL</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  onClick={handleTestPing}
+                  disabled={pingStatus.status === 'testing'}
+                  className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all disabled:opacity-50"
+                >
+                  <Activity className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>{pingStatus.status === 'testing' ? 'กำลังทดสอบ Ping...' : 'ทดสอบ Ping Webhook (จำลอง Verify)'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Card 2: LIFF Endpoint URL */}
+            <div className="bg-white p-5 rounded-2xl border border-sky-200 shadow-2xs flex flex-col justify-between space-y-4">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="w-8 h-8 rounded-xl bg-sky-100 text-sky-800 flex items-center justify-center font-bold text-sm">
+                    2
+                  </span>
+                  <span className="px-2.5 py-0.5 bg-sky-100 text-sky-800 rounded-full text-[10px] font-bold">
+                    LINE LIFF Console
+                  </span>
+                </div>
+
+                <div>
+                  <h4 className="text-sm font-bold text-slate-900">
+                    LIFF Endpoint URL (ตอนสร้าง LIFF App)
+                  </h4>
+                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                    นำลิงก์นี้ไปใส่ในแท็บ <strong>LIFF</strong> &gt; <strong>Add</strong> ใน LINE Developers Console ที่ช่อง <strong>Endpoint URL</strong> (เลือกขนาด Full หรือ Tall)
+                  </p>
+                </div>
+
+                <div className="p-3 bg-slate-900 text-sky-300 font-mono text-xs rounded-xl break-all select-all border border-slate-800">
+                  {generatedLiffEndpointUrl}
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 space-y-2">
+                <button
+                  onClick={() => handleCopy(generatedLiffEndpointUrl, 'card-liff-endpoint')}
+                  className="w-full py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center justify-center gap-2 transition-all"
+                >
+                  {copiedUrl === 'card-liff-endpoint' ? (
+                    <>
+                      <Check className="w-4 h-4 text-white" />
+                      <span>คัดลอก Endpoint URL แล้ว!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4" />
+                      <span>คัดลอก Endpoint URL</span>
+                    </>
+                  )}
+                </button>
+
+                <a
+                  href={generatedLiffEndpointUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
+                >
+                  <ExternalLink className="w-3.5 h-3.5 text-sky-600" />
+                  <span>เปิดทดสอบหน้า LIFF ในแท็บใหม่</span>
+                </a>
+              </div>
+            </div>
+
+            {/* Card 3: Final LIFF App URL */}
+            <div className="bg-white p-5 rounded-2xl border border-amber-200 shadow-2xs flex flex-col justify-between space-y-4">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="w-8 h-8 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-sm">
+                    3
+                  </span>
+                  <span className="px-2.5 py-0.5 bg-amber-100 text-amber-800 rounded-full text-[10px] font-bold">
+                    พนักงานเปิดบน LINE
+                  </span>
+                </div>
+
+                <div>
+                  <h4 className="text-sm font-bold text-slate-900">
+                    LINE LIFF URL สำเร็จรูป
+                  </h4>
+                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                    ลิงก์สำหรับส่งให้พนักงานคลิกใน LINE หรือนำไปผูกกับ <strong>Rich Menu</strong> ของ LINE Official Account
+                  </p>
+                </div>
+
+                {/* Quick LIFF ID Input & Link */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <label className="text-[11px] font-bold text-slate-700 shrink-0">
+                      LIFF ID:
+                    </label>
+                    <input
+                      type="text"
+                      value={liffId}
+                      onChange={(e) => handleQuickUpdateLiffId(e.target.value)}
+                      placeholder="เช่น 2001928374-xY9zL4a1"
+                      className="flex-1 px-2.5 py-1 text-xs bg-slate-50 border border-slate-200 rounded-lg font-mono text-emerald-800 font-bold focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                  </div>
+
+                  <div className="p-3 bg-slate-900 text-amber-300 font-mono text-xs rounded-xl break-all select-all border border-slate-800">
+                    {generatedLiffUrl}
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 space-y-2">
+                <button
+                  onClick={() => handleCopy(generatedLiffUrl, 'card-liff-app')}
+                  className="w-full py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center justify-center gap-2 transition-all"
+                >
+                  {copiedUrl === 'card-liff-app' ? (
+                    <>
+                      <Check className="w-4 h-4 text-white" />
+                      <span>คัดลอก LIFF URL แล้ว!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4" />
+                      <span>คัดลอก LIFF URL</span>
+                    </>
+                  )}
+                </button>
+
+                <a
+                  href={generatedLiffUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
+                >
+                  <Smartphone className="w-3.5 h-3.5 text-amber-600" />
+                  <span>เปิดทดสอบ LIFF App</span>
+                </a>
+              </div>
+            </div>
+
+          </div>
+
+          {/* Interactive QR Code & Mobile Warehouse Access */}
+          <div className="bg-slate-900 p-6 rounded-2xl text-white shadow-sm border border-slate-800 grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+            {/* Left Description */}
+            <div className="md:col-span-2 space-y-3">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/20 text-emerald-300 rounded-full text-xs font-bold border border-emerald-500/30">
+                <QrCode className="w-3.5 h-3.5" />
+                <span>Live QR Code สำหรับทดสอบบนมือถือทันที</span>
+              </div>
+              <h3 className="text-lg sm:text-xl font-bold">
+                สแกนเปิดระบบคลังสินค้าผ่าน LINE บนสมาร์ทโฟน
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-xl">
+                เปิดแอป LINE ในโทรศัพท์มือถือของคุณ แล้วเปิดกล้องสแกน QR Code นี้ จะเปิดเข้าสู่หน้าจอ 
+                <strong> KASA WMS LIFF</strong> ซึ่งออกแบบมาให้พนักงานคลังสามารถสแกนบาร์โค้ด, เช็คสต๊อกคงเหลือ และบันทึกรับเข้า/ส่งออกได้ง่ายและรวดเร็วบนมือถือทันที
+              </p>
+
+              <div className="pt-2 flex flex-wrap items-center gap-3 text-xs">
+                <div className="px-3 py-1.5 bg-slate-800/90 rounded-lg text-slate-200 border border-slate-700 flex items-center gap-2">
+                  <Check className="w-4 h-4 text-emerald-400" />
+                  <span>รองรับทั้ง iOS และ Android</span>
+                </div>
+                <div className="px-3 py-1.5 bg-slate-800/90 rounded-lg text-slate-200 border border-slate-700 flex items-center gap-2">
+                  <Check className="w-4 h-4 text-emerald-400" />
+                  <span>ไม่ต้องติดตั้งแอปพลิเคชันเพิ่ม</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Right QR Code Card */}
+            <div className="flex flex-col items-center justify-center p-5 bg-white rounded-2xl shadow-lg text-slate-900 text-center">
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 shadow-inner">
+                <QRCodeSVG
+                  value={generatedLiffUrl}
+                  size={160}
+                  level="H"
+                  includeMargin={true}
+                />
+              </div>
+              <p className="text-xs font-bold text-slate-900 mt-3">
+                สแกนเพื่อเปิด LINE LIFF
+              </p>
+              <p className="font-mono text-[10px] text-slate-400 mt-0.5 truncate max-w-[200px]">
+                {generatedLiffUrl}
+              </p>
+            </div>
+          </div>
+
+          {/* 4-Step Connection Checklist */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-2xs space-y-4">
+            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-emerald-600" />
+              <span>สรุป 4 ขั้นตอนการนำลิงก์ไปใช้งาน (Checklist)</span>
+            </h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+              <div className="p-4 bg-emerald-50/50 rounded-xl border border-emerald-200/80 space-y-2">
+                <span className="font-bold text-emerald-800 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <span>ขั้นตอนที่ 1: ตั้ง Webhook</span>
+                </span>
+                <p className="text-slate-600 leading-relaxed">
+                  ไปที่ <strong>Messaging API</strong> &gt; วาง <strong>Webhook URL</strong> &gt; เปิดสวิตช์ <strong>Use Webhook: ON</strong> แล้วกด <strong>Verify</strong>
+                </p>
+              </div>
+
+              <div className="p-4 bg-sky-50/50 rounded-xl border border-sky-200/80 space-y-2">
+                <span className="font-bold text-sky-800 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-sky-600" />
+                  <span>ขั้นตอนที่ 2: สร้าง LIFF App</span>
+                </span>
+                <p className="text-slate-600 leading-relaxed">
+                  ไปที่แท็บ <strong>LIFF</strong> ใน LINE Developers &gt; กด <strong>Add</strong> &gt; ใส่ชื่อแอป &gt; ขนาด Full หรือ Tall &gt; วาง <strong>Endpoint URL</strong>
+                </p>
+              </div>
+
+              <div className="p-4 bg-amber-50/50 rounded-xl border border-amber-200/80 space-y-2">
+                <span className="font-bold text-amber-800 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-amber-600" />
+                  <span>ขั้นตอนที่ 3: ระบุ LIFF ID</span>
+                </span>
+                <p className="text-slate-600 leading-relaxed">
+                  เมื่อสร้าง LIFF เสร็จ จะได้รับ <strong>LIFF ID</strong> ให้นำมากรอกในช่อง <strong>LIFF ID</strong> ด้านบน เพื่อให้ลิงก์ LIFF App อัปเดตสมบูรณ์
+                </p>
+              </div>
+
+              <div className="p-4 bg-purple-50/50 rounded-xl border border-purple-200/80 space-y-2">
+                <span className="font-bold text-purple-800 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-purple-600" />
+                  <span>ขั้นตอนที่ 4: เชื่อมกับ Rich Menu</span>
+                </span>
+                <p className="text-slate-600 leading-relaxed">
+                  นำ <strong>LIFF App URL</strong> ไปใส่ในปุ่ม Rich Menu ของ LINE OA เพื่อให้พนักงานกดเปิดระบบคลังสินค้าได้จากห้องแชทของ LINE ทันที
+                </p>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      )}
 
       {/* ================= TAB 1: WEBHOOK LIVE LOGS & INSPECTOR ================= */}
       {activeTab === 'logs' && (

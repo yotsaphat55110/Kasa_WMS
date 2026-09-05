@@ -13,6 +13,7 @@ import { LineIntegrationView } from './components/LineIntegrationView';
 import { ReportsView } from './components/ReportsView';
 import { GoogleSheetsDatabaseView } from './components/GoogleSheetsDatabaseView';
 import { LoginView } from './components/LoginView';
+import { LineLiffMobileView } from './components/LineLiffMobileView';
 
 import { InboundModal } from './components/InboundModal';
 import { OutboundModal } from './components/OutboundModal';
@@ -26,6 +27,15 @@ const MainContent: React.FC = () => {
   const { activeTab, isAuthenticated } = useApp();
 
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Check if opened with ?mode=liff or inside LINE LIFF
+  const [isLiffMode, setIsLiffMode] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('mode') === 'liff' || params.get('liff') === '1' || window.location.hash.includes('liff');
+    }
+    return false;
+  });
   
   // Modals state
   const [isInboundOpen, setIsInboundOpen] = useState(false);
@@ -45,6 +55,10 @@ const MainContent: React.FC = () => {
     setUserToEdit(user || null);
     setIsUserModalOpen(true);
   };
+
+  if (isLiffMode) {
+    return <LineLiffMobileView onExitLiffMode={() => setIsLiffMode(false)} />;
+  }
 
   if (!isAuthenticated) {
     return <LoginView />;

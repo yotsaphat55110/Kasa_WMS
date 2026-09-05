@@ -147,6 +147,7 @@ export interface LineConfig {
   channelSecret: string;
   channelAccessToken: string;
   liffId: string;
+  customDeployedUrl?: string;
   lineBotGroupId: string;
   lineBotEnabled: boolean;
   notifyLowStock: boolean;
