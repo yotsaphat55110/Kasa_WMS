@@ -85,7 +85,7 @@ interface AppContextType {
   saveUser: (userData: Partial<User>) => void;
   toggleUserStatus: (id: string) => void;
   updateLineConfig: (config: Partial<LineConfig>) => void;
-  triggerLineTestBroadcast: (customMsg?: string) => void;
+  triggerLineTestBroadcast: (customMsg?: string) => Promise<{ success: boolean; message: string }>;
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: () => void;
   
@@ -919,13 +919,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     addAuditLog('LINE_CONFIG_UPDATE', 'อัปเดตการตั้งค่าการเชื่อมต่อ LINE OA และ Bot Notification');
   };
 
-  const triggerLineTestBroadcast = async (customMsg?: string) => {
+  const triggerLineTestBroadcast = async (customMsg?: string): Promise<{ success: boolean; message: string }> => {
     const msg = customMsg || '📢 [LINE Bot Notification Test] ระบบคลังสินค้า KASA ทดสอบการแจ้งเตือนเชื่อมต่อกลุ่ม LINE OA สำเร็จเรียบร้อย!';
     addNotification('INBOUND', 'ทดสอบส่งการแจ้งเตือน LINE Bot Group', msg);
     addAuditLog('LINE_CONFIG_UPDATE', 'ทดสอบการส่งสัญญาณ LINE Bot Notification ไปยังกลุ่ม');
 
     try {
-      await fetch('/api/line/notify', {
+      const res = await fetch('/api/line/notify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -950,8 +950,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           }
         })
       });
-    } catch (err) {
+
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        return { success: true, message: data.message || 'ส่งข้อความทดสอบสำเร็จ!' };
+      } else {
+        return { success: false, message: data.message || 'เกิดข้อผิดพลาดในการส่งข้อความ' };
+      }
+    } catch (err: any) {
       console.warn('Live test push failed:', err);
+      return { success: false, message: err.message || 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้' };
     }
   };
 

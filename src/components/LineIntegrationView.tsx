@@ -54,6 +54,7 @@ export const LineIntegrationView: React.FC = () => {
   );
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
   const [testSuccess, setTestSuccess] = useState(false);
+  const [sendingTest, setSendingTest] = useState(false);
 
   // Webhook Logs state
   const [logs, setLogs] = useState<LineWebhookLog[]>([]);
@@ -278,15 +279,21 @@ export const LineIntegrationView: React.FC = () => {
             </button>
 
             <button
-              onClick={() => {
-                triggerLineTestBroadcast();
-                setTestSuccess(true);
-                setTimeout(() => setTestSuccess(false), 3000);
+              onClick={async () => {
+                setSendingTest(true);
+                const res = await triggerLineTestBroadcast();
+                setSendingTest(false);
+                if (res.success) {
+                  alert(`✅ สำเร็จ: ${res.message}`);
+                } else {
+                  alert(`❌ ล้มเหลว: ${res.message}\n\nกรุณาตรวจสอบว่า:\n1. บอทถูกเชิญเข้าร่วมกลุ่มไลน์นั้นเรียบร้อยแล้ว\n2. ค่า Channel Access Token ในแท็บ "ตั้งค่า API" ถูกต้องและเป็นแบบ Long-lived\n3. ค่า Target Group ID ถูกต้อง`);
+                }
               }}
-              className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-sm flex items-center gap-2 transition-all"
+              disabled={sendingTest}
+              className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-sm flex items-center gap-2 transition-all disabled:opacity-50"
             >
               <Send className="w-4 h-4" />
-              <span>ส่งข้อความทดสอบเข้ากลุ่ม</span>
+              <span>{sendingTest ? 'กำลังส่ง...' : 'ส่งข้อความทดสอบเข้ากลุ่ม'}</span>
             </button>
           </div>
         </div>
