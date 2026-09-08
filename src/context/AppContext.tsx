@@ -919,10 +919,40 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     addAuditLog('LINE_CONFIG_UPDATE', 'อัปเดตการตั้งค่าการเชื่อมต่อ LINE OA และ Bot Notification');
   };
 
-  const triggerLineTestBroadcast = (customMsg?: string) => {
+  const triggerLineTestBroadcast = async (customMsg?: string) => {
     const msg = customMsg || '📢 [LINE Bot Notification Test] ระบบคลังสินค้า KASA ทดสอบการแจ้งเตือนเชื่อมต่อกลุ่ม LINE OA สำเร็จเรียบร้อย!';
     addNotification('INBOUND', 'ทดสอบส่งการแจ้งเตือน LINE Bot Group', msg);
     addAuditLog('LINE_CONFIG_UPDATE', 'ทดสอบการส่งสัญญาณ LINE Bot Notification ไปยังกลุ่ม');
+
+    try {
+      await fetch('/api/line/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          channelAccessToken: lineConfig.channelAccessToken,
+          targetId: lineConfig.lineBotGroupId,
+          type: 'test',
+          title: '📢 LINE Bot Connection Test',
+          data: {
+            transactionCode: 'TEST-' + Math.floor(1000 + Math.random() * 9000),
+            operatorName: currentUser?.name || 'System Admin',
+            note: msg,
+            items: [
+              {
+                productName: 'สารเคมีตัวอย่างทดสอบ (Test Product)',
+                productCode: 'CHEM-TEST',
+                quantity: 1,
+                unit: 'รายการ',
+                zoneName: 'A1-TEST',
+                condition: 'GOOD'
+              }
+            ]
+          }
+        })
+      });
+    } catch (err) {
+      console.warn('Live test push failed:', err);
+    }
   };
 
   const markNotificationRead = (id: string) => {
