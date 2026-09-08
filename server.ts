@@ -224,10 +224,22 @@ async function startServer() {
         try {
           json = JSON.parse(text);
         } catch {
+          let customMsg = 'เซิร์ฟเวอร์ Google Apps Script ตอบกลับข้อมูลที่ไม่ใช่ JSON';
+          
+          if (text.includes('Google Accounts') || text.includes('ServiceLogin') || text.includes('Sign in')) {
+            customMsg = '⚠️ ติดสิทธิ์ล็อกอิน: กรุณาแก้ไขการตั้งค่าใน Apps Script ของคุณ โดยลบตัวเดิมแล้วกด Deploy > New deployment แล้วเลือก "สิทธิ์เข้าถึง (Who has access)" เป็น "ทุกคน (Anyone)" ⚠️ ห้ามเลือกเป็น "ทุกคนที่มีบัญชี Google" หรือ "เฉพาะฉัน"';
+          } else if (text.includes('Authorization Required') || text.includes('permission')) {
+            customMsg = '⚠️ ยังไม่ได้อนุมัติสิทธิ์: กรุณากด "Review Permissions" ใน Apps Script และกดเลือกบัญชีของท่านแล้วกด "Allow" (อนุญาต) เพื่อให้ระบบเข้าถึงสเปรดชีตได้สำเร็จ';
+          } else if (text.includes('script.google.com') && text.includes('Error')) {
+            customMsg = '⚠️ โค้ดสะกดผิดหรือมีจุดผิดพลาด: กรุณากด Copy โค้ดจากหน้าเว็บทางด้านซ้ายไปวางแทนที่ของเดิมทั้งหมดอีกครั้งใน Apps Script แล้วเซฟก่อนใช้งาน';
+          } else if (text.trim().startsWith('<!DOCTYPE html>') || text.trim().startsWith('<html')) {
+            customMsg = '⚠️ เว็บแอปของกูเกิลต้องการการตั้งค่าใหม่: กรุณากด Deploy > New Deployment ในหน้าต่าง Apps Script เลือกประเภทเป็น Web App และตั้งสิทธิ์เป็น Anyone (ทุกคน)';
+          }
+
           return res.status(400).json({ 
             success: false, 
-            message: 'เซิร์ฟเวอร์ Google Apps Script ตอบกลับข้อมูลที่ไม่ใช่ JSON', 
-            rawResponse: text 
+            message: customMsg, 
+            rawResponse: text.substring(0, 1000) 
           });
         }
         
@@ -245,10 +257,20 @@ async function startServer() {
         try {
           json = JSON.parse(text);
         } catch {
+          let customMsg = 'เซิร์ฟเวอร์ Google Apps Script ตอบกลับข้อมูลที่ไม่ใช่ JSON หลังทำรายการ';
+          
+          if (text.includes('Google Accounts') || text.includes('ServiceLogin') || text.includes('Sign in')) {
+            customMsg = '⚠️ ติดสิทธิ์ล็อกอิน (POST): กรุณาแก้ไขการตั้งค่าใน Apps Script ของคุณ โดยเลือก "สิทธิ์เข้าถึง (Who has access)" เป็น "ทุกคน (Anyone)" ⚠️ ห้ามเลือกเป็น "ทุกคนที่มีบัญชี Google" หรือ "เฉพาะฉัน"';
+          } else if (text.includes('Authorization Required') || text.includes('permission')) {
+            customMsg = '⚠️ ยังไม่ได้อนุมัติสิทธิ์ (POST): กรุณากด "Review Permissions" ใน Apps Script และกดเลือกบัญชีของท่านแล้วกด "Allow" (อนุญาต) เพื่อให้ระบบเข้าถึงสเปรดชีตได้สำเร็จ';
+          } else if (text.trim().startsWith('<!DOCTYPE html>') || text.trim().startsWith('<html')) {
+            customMsg = '⚠️ ไม่สำเร็จ (POST): Google ส่งคืนหน้า HTML คาดว่าสิทธิ์การแชร์ยังไม่ได้เปิดเป็น Anyone (ทุกคน)';
+          }
+
           return res.status(400).json({ 
             success: false, 
-            message: 'เซิร์ฟเวอร์ Google Apps Script ตอบกลับข้อมูลที่ไม่ใช่ JSON หลังทำรายการ', 
-            rawResponse: text 
+            message: customMsg, 
+            rawResponse: text.substring(0, 1000) 
           });
         }
         
@@ -287,6 +309,36 @@ async function startServer() {
     }
   });
 
+  // Helper to push a log entry to Google Sheets asynchronously
+  const tryPushLogToGoogleSheets = async (logEntry: any) => {
+    try {
+      if (fs.existsSync(CONFIG_FILE)) {
+        const raw = fs.readFileSync(CONFIG_FILE, 'utf-8');
+        const config = JSON.parse(raw);
+        const webAppUrl = config?.googleSheetsConfig?.webAppUrl;
+        if (webAppUrl && webAppUrl.trim()) {
+          fetch(webAppUrl.trim(), {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({
+              action: 'log',
+              data: {
+                id: logEntry.id,
+                timestamp: logEntry.timestamp,
+                userId: logEntry.userId || 'system',
+                userName: logEntry.userName || logEntry.sourceType || 'ระบบ WMS',
+                eventType: logEntry.eventType || 'webhook_event',
+                details: logEntry.details || ''
+              }
+            })
+          }).catch(err => console.warn('Failed to push webhook log to Google Sheets:', err));
+        }
+      }
+    } catch (e) {
+      console.warn('Error reading config during log push:', e);
+    }
+  };
+
   // 1. GET /api/line/webhook (Verification status for browser tests)
   app.get('/api/line/webhook', (req, res) => {
     res.json({
@@ -324,6 +376,10 @@ async function startServer() {
         };
         webhookLogs.unshift(verifyLog);
         if (webhookLogs.length > 500) webhookLogs.pop();
+        
+        // Push verify event to Google Sheet
+        tryPushLogToGoogleSheets(verifyLog);
+        
         return res.status(200).send('OK');
       }
 
@@ -464,6 +520,9 @@ async function startServer() {
 
         webhookLogs.unshift(logEntry);
         if (webhookLogs.length > 500) webhookLogs.pop();
+        
+        // Push log entry to Google Sheets asynchronously in the background
+        tryPushLogToGoogleSheets(logEntry);
       }
 
       // Always return HTTP 200 OK to LINE Webhook immediately

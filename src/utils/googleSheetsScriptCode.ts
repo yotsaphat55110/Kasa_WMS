@@ -336,6 +336,21 @@ function doPost(e) {
       return jsonResponse({ status: 'success', message: 'ซิงค์ข้อมูลทั้งระบบขึ้น Google Sheets เรียบร้อยแล้ว' });
     }
 
+    // กรณี D: บันทึก Log การทำงาน / Webhook Events ลงหน้าชีต AuditLogs
+    if (action === 'log') {
+      const logSheet = ss.getSheetByName(SHEET_NAMES.LOGS);
+      const item = postData.data;
+      logSheet.appendRow([
+        item.id || ('log-' + Date.now()),
+        item.timestamp || new Date().toISOString(),
+        item.userId || 'system',
+        item.userName || item.sourceType || 'ระบบ WMS',
+        item.eventType || 'web_event',
+        item.details || ''
+      ]);
+      return jsonResponse({ status: 'success', message: 'บันทึกประวัติการทำรายการลงชีต AuditLogs สำเร็จ' });
+    }
+
     return jsonResponse({ status: 'error', message: 'Unknown action: ' + action });
 
   } catch (error) {

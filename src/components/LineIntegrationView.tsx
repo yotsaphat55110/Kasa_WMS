@@ -13,7 +13,6 @@ import {
   Sparkles,
   ArrowDownLeft,
   ArrowUpRight,
-  Package,
   Radio,
   RefreshCw,
   Trash2,
@@ -22,25 +21,22 @@ import {
   ExternalLink,
   ChevronDown,
   ChevronUp,
-  Terminal,
   Activity,
   Check,
-  Play,
-  Share2,
   Info,
   Clock,
   AlertTriangle,
   Link,
   QrCode,
   Globe,
-  Download
+  Database
 } from 'lucide-react';
 
 export const LineIntegrationView: React.FC = () => {
-  const { lineConfig, updateLineConfig, triggerLineTestBroadcast, products, t } = useApp();
+  const { lineConfig, updateLineConfig, triggerLineTestBroadcast, t } = useApp();
 
   // Active view tab inside Line Integration
-  const [activeTab, setActiveTab] = useState<'liff-links' | 'logs' | 'setup' | 'config' | 'mobile'>('liff-links');
+  const [activeTab, setActiveTab] = useState<'config' | 'liff-links' | 'logs'>('config');
 
   // Credentials config state
   const [channelId, setChannelId] = useState(lineConfig.channelId);
@@ -72,13 +68,7 @@ export const LineIntegrationView: React.FC = () => {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [filterType, setFilterType] = useState<string>('all');
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
-  const [simulating, setSimulating] = useState(false);
   const [pingStatus, setPingStatus] = useState<{ status: 'idle' | 'testing' | 'success' | 'error'; message?: string; latency?: number }>({ status: 'idle' });
-
-  // Custom simulation modal/inputs
-  const [simMessageText, setSimMessageText] = useState('เช็คสต๊อกสินค้า KASA-001 คงเหลือในคลังให้หน่อยครับ');
-  const [simGroupName, setSimGroupName] = useState('กลุ่มคลังสินค้า & ฝ่ายจัดส่ง KASA');
-  const [simUserName, setSimUserName] = useState('สมเกียรติ สิทธิชัย (เจ้าหน้าที่คลัง)');
 
   // URLs resolution
   const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
@@ -101,10 +91,6 @@ export const LineIntegrationView: React.FC = () => {
   const generatedLiffEndpointUrl = `${activeBaseDomain}?mode=liff`;
   const cleanLiffId = (liffId || '').trim();
   const generatedLiffUrl = cleanLiffId ? `https://liff.line.me/${cleanLiffId}` : `https://liff.line.me/2001928374-xY9zL4a1`;
-
-  const currentWebhookUrl = `${currentOrigin}/api/line/webhook`;
-  const sharedWebhookUrl = `${defaultSharedDomain}/api/line/webhook`;
-  const liffUrl = generatedLiffUrl;
 
   // Fetch logs from Backend Express server
   const fetchWebhookLogs = useCallback(async () => {
@@ -161,31 +147,6 @@ export const LineIntegrationView: React.FC = () => {
     }, 4000);
   };
 
-  // Simulate an event (Message, Group Join, Follow)
-  const handleSimulateEvent = async (actionType: 'message' | 'group_join' | 'follow') => {
-    try {
-      setSimulating(true);
-      const res = await fetch('/api/line/simulate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          actionType,
-          customText: simMessageText,
-          customGroupName: simGroupName,
-          customUserName: simUserName,
-          isGroup: true
-        })
-      });
-      if (res.ok) {
-        await fetchWebhookLogs();
-      }
-    } catch (err) {
-      console.error('Simulation failed:', err);
-    } finally {
-      setSimulating(false);
-    }
-  };
-
   // Clear Logs
   const handleClearLogs = async () => {
     if (!window.confirm('คุณต้องการล้างประวัติ Webhook Logs ทั้งหมดใช่หรือไม่?')) return;
@@ -218,12 +179,6 @@ export const LineIntegrationView: React.FC = () => {
     updateLineConfig({ customDeployedUrl: cleaned });
     setTestSuccess(true);
     setTimeout(() => setTestSuccess(false), 2500);
-  };
-
-  const handleQuickUpdateLiffId = (newId: string) => {
-    const cleaned = newId.trim();
-    setLiffId(cleaned);
-    updateLineConfig({ liffId: cleaned });
   };
 
   const handleSaveConfig = (e: React.FormEvent) => {
@@ -259,33 +214,32 @@ export const LineIntegrationView: React.FC = () => {
   return (
     <div className="space-y-6">
       
-      {/* Top Banner & Webhook Live Status */}
+      {/* Top Professional Header */}
       <div className="bg-slate-900 p-6 rounded-2xl text-white shadow-sm border border-slate-800">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full text-xs font-semibold mb-3">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full text-xs font-semibold mb-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
               <Radio className="w-3.5 h-3.5" />
-              <span>LINE OA Webhook Gateway Online (HTTP 200 OK)</span>
+              <span>LINE Gateway Integration</span>
             </div>
             <h2 className="text-xl sm:text-2xl font-bold tracking-tight">
-              LINE Official Account & Webhook Real-time Monitor
+              เชื่อมต่อและตั้งค่า LINE Official Account
             </h2>
-            <p className="text-xs sm:text-sm text-slate-300 max-w-2xl mt-1.5 leading-relaxed">
-              รองรับทุกการกระทำจาก LINE Messaging API ตรวจจับข้อความเข้า, ผู้ส่ง (User ID), 
-              การเชิญเข้าร่วมกลุ่ม (Group ID), การเพิ่มเพื่อน และแจ้งเตือนคลังสินค้าอัตโนมัติ
+            <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
+              ผูกระบบคลังสินค้าเข้ากับ LINE OA เพื่อส่งการแจ้งเตือนยอดการรับเข้า-เบิกจ่ายสินค้าไปยังกลุ่มไลน์พนักงาน 
+              และรองรับระบบสมาร์ทโฟน LIFF สแกนสต๊อกได้ทันทีในแอปพลิเคชัน LINE
             </p>
           </div>
 
-          {/* Quick Action Buttons */}
-          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
             <button
               onClick={handleTestPing}
               disabled={pingStatus.status === 'testing'}
-              className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-sm flex items-center gap-2 transition-all disabled:opacity-50"
+              className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 rounded-xl text-xs font-bold shadow-xs flex items-center gap-2 transition-all disabled:opacity-50"
             >
-              <Activity className="w-4 h-4" />
-              <span>{pingStatus.status === 'testing' ? 'กำลังทดสอบ...' : 'ทดสอบ Ping Webhook'}</span>
+              <Activity className="w-4 h-4 text-emerald-400" />
+              <span>{pingStatus.status === 'testing' ? 'กำลังส่งคำขอทดสอบ...' : 'ทดสอบสัญญาณ Webhook'}</span>
             </button>
 
             <button
@@ -296,182 +250,28 @@ export const LineIntegrationView: React.FC = () => {
                 if (res.success) {
                   alert(`✅ สำเร็จ: ${res.message}`);
                 } else {
-                  alert(`❌ ล้มเหลว: ${res.message}\n\nกรุณาตรวจสอบว่า:\n1. บอทถูกเชิญเข้าร่วมกลุ่มไลน์นั้นเรียบร้อยแล้ว\n2. ค่า Channel Access Token ในแท็บ "ตั้งค่า API" ถูกต้องและเป็นแบบ Long-lived\n3. ค่า Target Group ID ถูกต้อง`);
+                  alert(`❌ ล้มเหลว: ${res.message}\n\nกรุณาตรวจสอบว่า:\n1. บอทถูกเชิญเข้าร่วมกลุ่มไลน์เรียบร้อยแล้ว\n2. ตั้งค่า Channel Access Token และ Target Group ID ถูกต้อง`);
                 }
               }}
               disabled={sendingTest}
-              className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-sm flex items-center gap-2 transition-all disabled:opacity-50"
+              className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-2 transition-all disabled:opacity-50"
             >
               <Send className="w-4 h-4" />
-              <span>{sendingTest ? 'กำลังส่ง...' : 'ส่งข้อความทดสอบเข้ากลุ่ม'}</span>
+              <span>{sendingTest ? 'กำลังส่งข้อความ...' : 'ส่งข้อความทดสอบเข้ากลุ่ม'}</span>
             </button>
           </div>
         </div>
 
-        {/* Webhook & LIFF Fast-Copy Grid */}
-        <div className="mt-5 pt-5 border-t border-slate-800/80 grid grid-cols-1 md:grid-cols-3 gap-3">
-          {/* 1. Webhook URL */}
-          <div className="p-3.5 bg-slate-950/70 border border-slate-800 rounded-xl flex flex-col justify-between gap-2">
-            <div>
-              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-400 mb-1">
-                <Share2 className="w-3.5 h-3.5" />
-                <span>1. Webhook URL (Messaging API):</span>
-              </div>
-              <p className="font-mono text-xs text-slate-200 truncate select-all">
-                {generatedWebhookUrl}
-              </p>
-            </div>
-            <div className="flex items-center justify-between pt-1 border-t border-slate-800/60">
-              <span className="text-[10px] text-slate-400">สำหรับรับ Event ข้อความ</span>
-              <button
-                onClick={() => handleCopy(generatedWebhookUrl, 'top-webhook')}
-                className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-medium flex items-center gap-1 transition-all"
-              >
-                {copiedUrl === 'top-webhook' ? (
-                  <>
-                    <Check className="w-3.5 h-3.5 text-emerald-400" />
-                    <span className="text-emerald-400">คัดลอกแล้ว</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-3.5 h-3.5 text-slate-400" />
-                    <span>คัดลอก URL</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-
-          {/* 2. LIFF Endpoint URL */}
-          <div className="p-3.5 bg-slate-950/70 border border-slate-800 rounded-xl flex flex-col justify-between gap-2">
-            <div>
-              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-sky-400 mb-1">
-                <ExternalLink className="w-3.5 h-3.5" />
-                <span>2. LIFF Endpoint URL (ตอนสร้าง LIFF):</span>
-              </div>
-              <p className="font-mono text-xs text-slate-200 truncate select-all">
-                {generatedLiffEndpointUrl}
-              </p>
-            </div>
-            <div className="flex items-center justify-between pt-1 border-t border-slate-800/60">
-              <span className="text-[10px] text-slate-400">ใส่ในช่อง Endpoint URL</span>
-              <button
-                onClick={() => handleCopy(generatedLiffEndpointUrl, 'top-liff-endpoint')}
-                className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-medium flex items-center gap-1 transition-all"
-              >
-                {copiedUrl === 'top-liff-endpoint' ? (
-                  <>
-                    <Check className="w-3.5 h-3.5 text-emerald-400" />
-                    <span className="text-emerald-400">คัดลอกแล้ว</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-3.5 h-3.5 text-slate-400" />
-                    <span>คัดลอก URL</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-
-          {/* 3. LIFF URL For Staff */}
-          <div className="p-3.5 bg-slate-950/70 border border-slate-800 rounded-xl flex flex-col justify-between gap-2">
-            <div>
-              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-amber-400 mb-1">
-                <Smartphone className="w-3.5 h-3.5" />
-                <span>3. LIFF App URL (ส่งให้พนักงานคลิก):</span>
-              </div>
-              <p className="font-mono text-xs text-slate-200 truncate select-all">
-                {generatedLiffUrl}
-              </p>
-            </div>
-            <div className="flex items-center justify-between pt-1 border-t border-slate-800/60">
-              <span className="text-[10px] text-slate-400">เปิดในแอป LINE บนมือถือ</span>
-              <button
-                onClick={() => handleCopy(generatedLiffUrl, 'top-liff-app')}
-                className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-medium flex items-center gap-1 transition-all"
-              >
-                {copiedUrl === 'top-liff-app' ? (
-                  <>
-                    <Check className="w-3.5 h-3.5 text-emerald-400" />
-                    <span className="text-emerald-400">คัดลอกแล้ว</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-3.5 h-3.5 text-slate-400" />
-                    <span>คัดลอก LIFF</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
+        {/* Global Auto-Log Notification to Sheet */}
+        <div className="mt-4 p-3 bg-emerald-950/40 border border-emerald-500/20 rounded-xl text-emerald-300 text-xs flex items-center gap-2">
+          <Database className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>💡 <strong>ฟีเจอร์พิเศษ:</strong> ทุกประวัติกิจกรรมของ LINE Webhook จะถูกบันทึกส่งไปเก็บที่แท็บชีต <strong>"AuditLogs"</strong> ใน Google Sheets ของคุณโดยอัตโนมัติ เพื่อให้สามารถดูประวัติย้อนหลังได้ถาวร!</span>
         </div>
-
-        {/* Feedback Bar */}
-        {pingStatus.status === 'success' && (
-          <div className="mt-3 p-3 bg-emerald-950/80 border border-emerald-500/40 rounded-xl text-emerald-300 text-xs flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>{pingStatus.message}</span>
-            </div>
-            {pingStatus.latency && (
-              <span className="font-mono text-[11px] text-emerald-400/90">
-                Latency: {pingStatus.latency} ms
-              </span>
-            )}
-          </div>
-        )}
       </div>
 
-      {/* Sub-Navigation Tabs */}
+      {/* Modern High-Contrast Light Tabs */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-2">
         <div className="flex items-center gap-1.5 overflow-x-auto">
-          <button
-            onClick={() => setActiveTab('liff-links')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shrink-0 ${
-              activeTab === 'liff-links'
-                ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-500/20'
-                : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
-            }`}
-          >
-            <Link className="w-3.5 h-3.5" />
-            <span>ลิงก์ Webhook & LINE LIFF สำเร็จรูป</span>
-            <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-              activeTab === 'liff-links' ? 'bg-emerald-800 text-emerald-100' : 'bg-emerald-100 text-emerald-800'
-            }`}>
-              แนะนำ
-            </span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('logs')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shrink-0 ${
-              activeTab === 'logs'
-                ? 'bg-emerald-600 text-white shadow-sm'
-                : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
-            }`}
-          >
-            <Radio className="w-3.5 h-3.5" />
-            <span>Webhook Live Logs & Inspector</span>
-            <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${
-              activeTab === 'logs' ? 'bg-emerald-800 text-emerald-100' : 'bg-slate-100 text-slate-600'
-            }`}>
-              {logs.length}
-            </span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('setup')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shrink-0 ${
-              activeTab === 'setup'
-                ? 'bg-blue-600 text-white shadow-sm'
-                : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
-            }`}
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-            <span>วิธีนำไปใส่ใน LINE Developers</span>
-          </button>
-
           <button
             onClick={() => setActiveTab('config')}
             className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shrink-0 ${
@@ -480,20 +280,37 @@ export const LineIntegrationView: React.FC = () => {
                 : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
             }`}
           >
-            <ShieldCheck className="w-3.5 h-3.5" />
-            <span>ตั้งค่า Messaging API & เงื่อนไขแจ้งเตือน</span>
+            <ShieldCheck className="w-4 h-4" />
+            <span>1. ตั้งค่าบัญชี LINE OA & การแจ้งเตือน</span>
           </button>
 
           <button
-            onClick={() => setActiveTab('mobile')}
+            onClick={() => setActiveTab('liff-links')}
             className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shrink-0 ${
-              activeTab === 'mobile'
-                ? 'bg-emerald-700 text-white shadow-sm'
+              activeTab === 'liff-links'
+                ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-500/10'
+                : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+            }`}
+          >
+            <Link className="w-4 h-4" />
+            <span>2. ลิงก์เชื่อมต่อ Webhook & QR Code มือถือ</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('logs')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shrink-0 ${
+              activeTab === 'logs'
+                ? 'bg-blue-600 text-white shadow-sm'
                 : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
             }`}
           >
-            <Smartphone className="w-3.5 h-3.5" />
-            <span>จำลองหน้าจอ LINE LIFF บนมือถือ</span>
+            <Radio className="w-4 h-4" />
+            <span>3. ประวัติกิจกรรม Webhook Logs</span>
+            <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${
+              activeTab === 'logs' ? 'bg-blue-800 text-blue-100' : 'bg-slate-100 text-slate-600'
+            }`}>
+              {logs.length}
+            </span>
           </button>
         </div>
 
@@ -523,37 +340,216 @@ export const LineIntegrationView: React.FC = () => {
         )}
       </div>
 
-      {/* ================= TAB 0: WEBHOOK & LIFF READY-TO-USE LINKS ================= */}
-      {activeTab === 'liff-links' && (
-        <div className="space-y-6">
-          
-          {/* Domain Selection & Deployed URL Configurator */}
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+      {/* ================= TAB 1: API CONFIGURATION & TRIGGERS ================= */}
+      {activeTab === 'config' && (
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-2xs space-y-6">
+          <div className="pb-4 border-b border-slate-100">
+            <h3 className="font-bold text-slate-900 text-base">กรอกข้อมูลเชื่อมต่อ Messaging API</h3>
+            <p className="text-xs text-slate-500 mt-1">
+              นำข้อมูลชุดเหล่านี้มาจากหน้า <strong>LINE Developers Console</strong> เพื่ออนุญาตให้เว็บสั่งงานบอทส่งแจ้งเตือนและเชื่อมต่อระบบ LIFF มือถือ
+            </p>
+          </div>
+
+          <form onSubmit={handleSaveConfig} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              
               <div>
-                <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                  <Globe className="w-4 h-4 text-blue-600" />
-                  <span>เลือกโดเมนที่คุณ Deploy สำหรับสร้างลิงก์ Webhook และ LIFF</span>
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  ระบบจะคำนวณ Webhook URL และ LIFF Endpoint URL ให้ตรงกับโดเมนที่คุณเลือกโดยอัตโนมัติ
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  LINE Channel ID (สิบหลัก)
+                </label>
+                <input
+                  type="text"
+                  value={channelId}
+                  onChange={(e) => setChannelId(e.target.value)}
+                  placeholder="เช่น 2001928374"
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  LINE Channel Secret
+                </label>
+                <input
+                  type="password"
+                  value={channelSecret}
+                  onChange={(e) => setChannelSecret(e.target.value)}
+                  placeholder="รหัสลับผู้พัฒนา (ลับเฉพาะ)"
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  LINE Channel Access Token (แบบ Long-lived)
+                </label>
+                <textarea
+                  value={accessToken}
+                  onChange={(e) => setAccessToken(e.target.value)}
+                  placeholder="คัดลอกโทเค็นแบบยาวที่สร้างขึ้นจากหน้า Messaging API มาวางที่นี่..."
+                  rows={2}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  LINE LIFF ID (สำหรับเปิดระบบบนสมาร์ทโฟนพนักงาน)
+                </label>
+                <input
+                  type="text"
+                  value={liffId}
+                  onChange={(e) => setLiffId(e.target.value)}
+                  placeholder="เช่น 2001928374-xY9zL4a1"
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-mono text-emerald-800 font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+                <p className="text-[10px] text-slate-400 mt-1">
+                  💡 ดูวิธีสร้าง LIFF ได้ที่แท็บลิงก์นำไปติดตั้ง
                 </p>
               </div>
 
-              {testSuccess && (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-xs font-bold animate-in fade-in">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>บันทึกโดเมนเรียบร้อยแล้ว</span>
-                </span>
-              )}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Target Group ID (ไอดีกลุ่มคลังสินค้าสำหรับการส่งแจ้งเตือน)
+                </label>
+                <input
+                  type="text"
+                  value={groupId}
+                  onChange={(e) => setGroupId(e.target.value)}
+                  placeholder="เช่น C12a34b56c78d90e1f23456789abcdef0"
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+                <p className="text-[10px] text-slate-400 mt-1">
+                  💡 วิธีหาอย่างง่าย: เชิญบอทเข้ากลุ่มแล้วคัดลอก Group ID จากแท็บ Webhook Logs ด้านบนมาวางได้เลยครับ
+                </p>
+              </div>
+
             </div>
 
-            {/* Source Selector Radios */}
+            {/* Event Notification Toggles */}
+            <div className="pt-5 border-t border-slate-100 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <span className="font-bold text-sm text-slate-900 flex items-center gap-1.5">
+                    <Bell className="w-4 h-4 text-emerald-600" />
+                    กำหนดหัวข้อเงื่อนไขการส่งแจ้งเตือนเข้ากลุ่ม (Alert Triggers)
+                  </span>
+                  <p className="text-xs text-slate-500">เลือกเปิด-ปิดชนิดการแจ้งเตือนพนักงานตามประเภทของสินค้าและคลัง</p>
+                </div>
+
+                <label className="flex items-center gap-2 cursor-pointer bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">
+                  <input
+                    type="checkbox"
+                    checked={lineConfig.lineBotEnabled}
+                    onChange={(e) => updateLineConfig({ lineBotEnabled: e.target.checked })}
+                    className="w-4 h-4 text-emerald-600 rounded-xs border-slate-300"
+                  />
+                  <span className="text-xs font-bold text-slate-800">เปิดระบบส่งข้อความบอทอัตโนมัติ</span>
+                </label>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <label className="flex items-center gap-2.5 p-3 bg-slate-50 hover:bg-slate-100/50 rounded-xl border border-slate-200 cursor-pointer transition-all">
+                  <input
+                    type="checkbox"
+                    checked={lineConfig.notifyInbound}
+                    onChange={(e) => updateLineConfig({ notifyInbound: e.target.checked })}
+                    className="w-4 h-4 text-emerald-600 rounded-xs"
+                  />
+                  <div>
+                    <span className="text-slate-800 font-bold block">1. แจ้งเตือนเมื่อรับสินค้าเข้าคลัง (Inbound Alert)</span>
+                    <span className="text-[10px] text-slate-400">ส่งรายละเอียดรหัสรายการ, ยอดรับเข้า, ชื่อผู้รับ, โซนจัดเก็บ</span>
+                  </div>
+                </label>
+
+                <label className="flex items-center gap-2.5 p-3 bg-slate-50 hover:bg-slate-100/50 rounded-xl border border-slate-200 cursor-pointer transition-all">
+                  <input
+                    type="checkbox"
+                    checked={lineConfig.notifyOutbound}
+                    onChange={(e) => updateLineConfig({ notifyOutbound: e.target.checked })}
+                    className="w-4 h-4 text-sky-600 rounded-xs"
+                  />
+                  <div>
+                    <span className="text-slate-800 font-bold block">2. แจ้งเตือนเมื่อส่งออกสินค้าคลัง (Outbound Alert)</span>
+                    <span className="text-[10px] text-slate-400">ส่งรายชื่อผู้เบิกสินค้า, ยอดเบิกจ่าย, ปลายทาง, คลังและชั้นวาง</span>
+                  </div>
+                </label>
+
+                <label className="flex items-center gap-2.5 p-3 bg-amber-50/50 hover:bg-amber-50 rounded-xl border border-amber-200/60 cursor-pointer transition-all">
+                  <input
+                    type="checkbox"
+                    checked={lineConfig.notifyLowStock}
+                    onChange={(e) => updateLineConfig({ notifyLowStock: e.target.checked })}
+                    className="w-4 h-4 text-amber-600 rounded-xs"
+                  />
+                  <div>
+                    <span className="text-amber-950 font-bold block">3. แจ้งเตือนสินค้าใกล้หมดสต๊อก (Low Stock Alert)</span>
+                    <span className="text-[10px] text-amber-700">ส่งเตือนทันทีถ้ายอดรวมสินค้าใดต่ำกว่าจุดเตือนภัยขั้นต่ำ</span>
+                  </div>
+                </label>
+
+                <label className="flex items-center gap-2.5 p-3 bg-rose-50/50 hover:bg-rose-50 rounded-xl border border-rose-200/60 cursor-pointer transition-all">
+                  <input
+                    type="checkbox"
+                    checked={lineConfig.notifyDamaged}
+                    onChange={(e) => updateLineConfig({ notifyDamaged: e.target.checked })}
+                    className="w-4 h-4 text-rose-600 rounded-xs"
+                  />
+                  <div>
+                    <span className="text-rose-950 font-bold block">4. แจ้งเตือนสินค้าเสียหายหรือชำรุด (Damaged Alert)</span>
+                    <span className="text-[10px] text-rose-700">ส่งเตือนทันทีที่มีการอัปเดตยอดของชำรุดในระบบคลัง</span>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            {/* Save Buttons & Feedback */}
+            <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+              <span className="text-xs text-slate-400 flex items-center gap-1">
+                <Info className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                ระบบจะบันทึกการเปลี่ยนแปลงลงเซิร์ฟเวอร์หลังบ้านแบบถาวร
+              </span>
+
+              <div className="flex items-center gap-3">
+                {testSuccess && (
+                  <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 border border-emerald-200 rounded-xl animate-pulse">
+                    ✓ บันทึกการเชื่อมต่อบัญชี LINE สำเร็จ!
+                  </span>
+                )}
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-xs transition-all"
+                >
+                  บันทึกการตั้งค่าทั้งหมด
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* ================= TAB 2: LINK CONFIGURATOR & SCAN QR ================= */}
+      {activeTab === 'liff-links' && (
+        <div className="space-y-6">
+          
+          {/* Domain Resolver Header */}
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-4">
+            <div>
+              <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                <Globe className="w-4 h-4 text-blue-600" />
+                <span>ระบุชื่อโดเมนของเซิร์ฟเวอร์คุณ เพื่อคำนวณลิงก์ Webhook และ LIFF</span>
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                เลือกโดเมนที่เหมาะสมเพื่อสร้างลิงก์สำเร็จรูป นำไปวางในหน้าจัดการ LINE developers ได้ทันที
+              </p>
+            </div>
+
+            {/* Select Sources */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
               <label 
                 className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
                   selectedUrlSource === 'shared'
-                    ? 'border-emerald-500 bg-emerald-50/50 ring-1 ring-emerald-500'
+                    ? 'border-emerald-500 bg-emerald-50/40 ring-1 ring-emerald-500'
                     : 'border-slate-200 hover:border-slate-300 bg-slate-50/50'
                 }`}
               >
@@ -571,14 +567,14 @@ export const LineIntegrationView: React.FC = () => {
                   {defaultSharedDomain}
                 </p>
                 <span className="text-[10px] text-emerald-700 font-semibold mt-1 inline-block">
-                  ✓ พร้อมใช้งานทันที ไม่ต้องตั้งค่าเพิ่ม
+                  ✓ เสถียรที่สุด พร้อมใช้งานทันที
                 </span>
               </label>
 
               <label 
                 className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
                   selectedUrlSource === 'current'
-                    ? 'border-emerald-500 bg-emerald-50/50 ring-1 ring-emerald-500'
+                    ? 'border-emerald-500 bg-emerald-50/40 ring-1 ring-emerald-500'
                     : 'border-slate-200 hover:border-slate-300 bg-slate-50/50'
                 }`}
               >
@@ -590,20 +586,20 @@ export const LineIntegrationView: React.FC = () => {
                     onChange={() => setSelectedUrlSource('current')}
                     className="text-emerald-600"
                   />
-                  <span className="font-bold text-slate-900">โดเมนที่เปิดใช้งานอยู่ขณะนี้</span>
+                  <span className="font-bold text-slate-900">โดเมนที่เปิดอยู่ ณ ตอนนี้</span>
                 </div>
                 <p className="font-mono text-[11px] text-slate-500 mt-1 truncate">
                   {currentOrigin || 'กำลังโหลด...'}
                 </p>
                 <span className="text-[10px] text-slate-500 mt-1 inline-block">
-                  (Direct Browser Origin)
+                  (Browser Direct Origin)
                 </span>
               </label>
 
               <label 
                 className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
                   selectedUrlSource === 'custom'
-                    ? 'border-emerald-500 bg-emerald-50/50 ring-1 ring-emerald-500'
+                    ? 'border-emerald-500 bg-emerald-50/40 ring-1 ring-emerald-500'
                     : 'border-slate-200 hover:border-slate-300 bg-slate-50/50'
                 }`}
               >
@@ -615,213 +611,161 @@ export const LineIntegrationView: React.FC = () => {
                     onChange={() => setSelectedUrlSource('custom')}
                     className="text-emerald-600"
                   />
-                  <span className="font-bold text-slate-900">Custom Deployed Domain</span>
+                  <span className="font-bold text-slate-900">ระบุชื่อโดเมนด้วยตนเอง</span>
                 </div>
                 <p className="text-[11px] text-slate-500 mt-1">
-                  (เช่น Deploy บน Vercel, Render, Cloudflare หรือโดเมนส่วนตัว)
+                  (เช่น โดเมนที่ได้จาก Render: kasa-wms.onrender.com)
                 </p>
-                <span className="text-[10px] text-blue-700 font-semibold mt-1 inline-block">
-                  พิมพ์ URL เองได้ด้านล่าง
-                </span>
               </label>
             </div>
 
-            {/* Custom URL Input Field */}
+            {/* Custom inputs */}
             {selectedUrlSource === 'custom' && (
-              <div className="p-3.5 bg-blue-50/60 border border-blue-200 rounded-xl space-y-2">
-                <label className="block text-xs font-bold text-blue-950">
-                  ระบุ URL ของเว็บที่คุณ Deploy ผ่าน GitHub (เช่น https://kasa-wms.vercel.app):
+              <div className="p-3.5 bg-emerald-50/30 border border-emerald-200 rounded-xl space-y-2">
+                <label className="block text-xs font-bold text-slate-800">
+                  ระบุ URL ของเว็บแอป (เช่น https://kasa-wms.onrender.com):
                 </label>
                 <div className="flex items-center gap-2">
                   <input
                     type="url"
                     value={customDeployedUrl}
                     onChange={(e) => setCustomDeployedUrl(e.target.value)}
-                    placeholder="https://your-domain.vercel.app"
-                    className="flex-1 px-3 py-2 text-xs bg-white border border-blue-300 rounded-xl font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="https://your-app.onrender.com"
+                    className="flex-1 px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl font-mono text-slate-800 focus:outline-none"
                   />
                   <button
                     type="button"
                     onClick={() => handleSaveCustomDomain(customDeployedUrl)}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all shrink-0"
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all"
                   >
-                    บันทึกโดเมน
+                    ผูกโดเมน
                   </button>
                 </div>
               </div>
             )}
           </div>
 
-          {/* 3 Core Production Link Cards */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          {/* Links grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             
-            {/* Card 1: Webhook URL */}
-            <div className="bg-white p-5 rounded-2xl border border-emerald-200 shadow-2xs flex flex-col justify-between space-y-4">
+            {/* Link 1: Webhook URL */}
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs flex flex-col justify-between space-y-4">
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-sm">
-                    1
+                  <span className="px-2.5 py-1 bg-slate-100 text-slate-800 rounded-full text-[10px] font-bold">
+                    1. LINE Webhook Endpoint URL
                   </span>
-                  <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 rounded-full text-[10px] font-bold">
-                    LINE Messaging API
-                  </span>
+                  <span className="text-[10px] text-emerald-600 font-bold">Messaging API</span>
                 </div>
 
                 <div>
-                  <h4 className="text-sm font-bold text-slate-900">
-                    Webhook URL (สำหรับใส่ใน LINE OA)
-                  </h4>
+                  <h4 className="text-xs font-bold text-slate-900">ลิงก์ใช้กรอกใน LINE Developers Console</h4>
                   <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                    นำลิงก์นี้ไปใส่ในแท็บ <strong>Messaging API</strong> &gt; <strong>Webhook settings</strong> &gt; <strong>Webhook URL</strong> แล้วเปิด <strong>Use Webhook</strong>
+                    ก๊อปปี้ลิงก์นี้ไปวางที่ช่อง <strong>Webhook URL</strong> แล้วเปิดสวิตช์ <strong>Use Webhook</strong> เพื่อรับ Event ความเคลื่อนไหวในกลุ่มและแชต
                   </p>
                 </div>
 
-                <div className="p-3 bg-slate-900 text-emerald-400 font-mono text-xs rounded-xl break-all select-all border border-slate-800">
+                <div className="p-3 bg-slate-950 text-emerald-400 font-mono text-xs rounded-xl break-all border border-slate-800">
                   {generatedWebhookUrl}
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-slate-100 space-y-2">
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end">
                 <button
-                  onClick={() => handleCopy(generatedWebhookUrl, 'card-webhook')}
-                  className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center justify-center gap-2 transition-all"
+                  onClick={() => handleCopy(generatedWebhookUrl, 'setup-webhook')}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all"
                 >
-                  {copiedUrl === 'card-webhook' ? (
+                  {copiedUrl === 'setup-webhook' ? (
                     <>
-                      <Check className="w-4 h-4 text-white" />
-                      <span>คัดลอก Webhook URL แล้ว!</span>
+                      <Check className="w-3.5 h-3.5 text-white" />
+                      <span>คัดลอกสำเร็จ!</span>
                     </>
                   ) : (
                     <>
-                      <Copy className="w-4 h-4" />
-                      <span>คัดลอก Webhook URL</span>
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>คัดลอกลิงก์ Webhook</span>
                     </>
                   )}
-                </button>
-
-                <button
-                  onClick={handleTestPing}
-                  disabled={pingStatus.status === 'testing'}
-                  className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all disabled:opacity-50"
-                >
-                  <Activity className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>{pingStatus.status === 'testing' ? 'กำลังทดสอบ Ping...' : 'ทดสอบ Ping Webhook (จำลอง Verify)'}</span>
                 </button>
               </div>
             </div>
 
-            {/* Card 2: LIFF Endpoint URL */}
-            <div className="bg-white p-5 rounded-2xl border border-sky-200 shadow-2xs flex flex-col justify-between space-y-4">
+            {/* Link 2: LIFF Endpoint URL */}
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs flex flex-col justify-between space-y-4">
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="w-8 h-8 rounded-xl bg-sky-100 text-sky-800 flex items-center justify-center font-bold text-sm">
-                    2
+                  <span className="px-2.5 py-1 bg-slate-100 text-slate-800 rounded-full text-[10px] font-bold">
+                    2. LINE LIFF Endpoint URL
                   </span>
-                  <span className="px-2.5 py-0.5 bg-sky-100 text-sky-800 rounded-full text-[10px] font-bold">
-                    LINE LIFF Console
-                  </span>
+                  <span className="text-[10px] text-blue-600 font-bold">LIFF App Creation</span>
                 </div>
 
                 <div>
-                  <h4 className="text-sm font-bold text-slate-900">
-                    LIFF Endpoint URL (ตอนสร้าง LIFF App)
-                  </h4>
+                  <h4 className="text-xs font-bold text-slate-900">ลิงก์ปลายทางขณะกดสร้าง LIFF App</h4>
                   <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                    นำลิงก์นี้ไปใส่ในแท็บ <strong>LIFF</strong> &gt; <strong>Add</strong> ใน LINE Developers Console ที่ช่อง <strong>Endpoint URL</strong> (เลือกขนาด Full หรือ Tall)
+                    นำลิงก์นี้ไปใส่ที่หน้าช่อง <strong>Endpoint URL</strong> บนตั้งค่าหน้า LINE Developers ในหมวด LIFF (แนะนำขนาด Full-width)
                   </p>
                 </div>
 
-                <div className="p-3 bg-slate-900 text-sky-300 font-mono text-xs rounded-xl break-all select-all border border-slate-800">
+                <div className="p-3 bg-slate-950 text-blue-300 font-mono text-xs rounded-xl break-all border border-slate-800">
                   {generatedLiffEndpointUrl}
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-slate-100 space-y-2">
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end">
                 <button
-                  onClick={() => handleCopy(generatedLiffEndpointUrl, 'card-liff-endpoint')}
-                  className="w-full py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center justify-center gap-2 transition-all"
+                  onClick={() => handleCopy(generatedLiffEndpointUrl, 'setup-liff-endpoint')}
+                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all"
                 >
-                  {copiedUrl === 'card-liff-endpoint' ? (
+                  {copiedUrl === 'setup-liff-endpoint' ? (
                     <>
-                      <Check className="w-4 h-4 text-white" />
-                      <span>คัดลอก Endpoint URL แล้ว!</span>
+                      <Check className="w-3.5 h-3.5 text-white" />
+                      <span>คัดลอกสำเร็จ!</span>
                     </>
                   ) : (
                     <>
-                      <Copy className="w-4 h-4" />
-                      <span>คัดลอก Endpoint URL</span>
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>คัดลอกลิงก์ Endpoint</span>
                     </>
                   )}
                 </button>
-
-                <a
-                  href={generatedLiffEndpointUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
-                >
-                  <ExternalLink className="w-3.5 h-3.5 text-sky-600" />
-                  <span>เปิดทดสอบหน้า LIFF ในแท็บใหม่</span>
-                </a>
               </div>
             </div>
 
-            {/* Card 3: Final LIFF App URL */}
-            <div className="bg-white p-5 rounded-2xl border border-amber-200 shadow-2xs flex flex-col justify-between space-y-4">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="w-8 h-8 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-sm">
-                    3
-                  </span>
-                  <span className="px-2.5 py-0.5 bg-amber-100 text-amber-800 rounded-full text-[10px] font-bold">
-                    พนักงานเปิดบน LINE
-                  </span>
-                </div>
+          </div>
 
-                <div>
-                  <h4 className="text-sm font-bold text-slate-900">
-                    LINE LIFF URL สำเร็จรูป
-                  </h4>
-                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                    ลิงก์สำหรับส่งให้พนักงานคลิกใน LINE หรือนำไปผูกกับ <strong>Rich Menu</strong> ของ LINE Official Account
-                  </p>
-                </div>
+          {/* QR Code and Direct URL access */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-2xs grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+            <div className="md:col-span-2 space-y-3">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-bold border border-emerald-200">
+                <QrCode className="w-3.5 h-3.5" />
+                <span>สแกน QR Code เพื่อเปิดใช้งานผ่านมือถือ</span>
+              </div>
+              <h3 className="text-base font-bold text-slate-900">
+                สำหรับส่งให้พนักงานคลังสแกนทำงานทันที (LIFF App Link)
+              </h3>
+              <p className="text-xs text-slate-500 leading-relaxed max-w-xl">
+                ลิงก์นี้คือ LINE LIFF App ที่พนักงานเปิดใช้งานบนแอปพลิเคชัน LINE เพื่อเช็คสต๊อกสินค้า สแกนตรวจสอบบาร์โค้ด และบันทึกเบิกพัสดุรับเข้าส่งออกได้สะดวกรวดเร็ว
+              </p>
 
-                {/* Quick LIFF ID Input & Link */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <label className="text-[11px] font-bold text-slate-700 shrink-0">
-                      LIFF ID:
-                    </label>
-                    <input
-                      type="text"
-                      value={liffId}
-                      onChange={(e) => handleQuickUpdateLiffId(e.target.value)}
-                      placeholder="เช่น 2001928374-xY9zL4a1"
-                      className="flex-1 px-2.5 py-1 text-xs bg-slate-50 border border-slate-200 rounded-lg font-mono text-emerald-800 font-bold focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                    />
-                  </div>
-
-                  <div className="p-3 bg-slate-900 text-amber-300 font-mono text-xs rounded-xl break-all select-all border border-slate-800">
-                    {generatedLiffUrl}
-                  </div>
-                </div>
+              <div className="p-3 bg-slate-900 text-amber-300 font-mono text-xs rounded-xl select-all break-all max-w-xl border border-slate-800">
+                {generatedLiffUrl}
               </div>
 
-              <div className="pt-3 border-t border-slate-100 space-y-2">
+              <div className="pt-1.5 flex items-center gap-3">
                 <button
-                  onClick={() => handleCopy(generatedLiffUrl, 'card-liff-app')}
-                  className="w-full py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center justify-center gap-2 transition-all"
+                  onClick={() => handleCopy(generatedLiffUrl, 'copy-final-liff')}
+                  className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5"
                 >
-                  {copiedUrl === 'card-liff-app' ? (
+                  {copiedUrl === 'copy-final-liff' ? (
                     <>
                       <Check className="w-4 h-4 text-white" />
-                      <span>คัดลอก LIFF URL แล้ว!</span>
+                      <span>คัดลอกแล้ว</span>
                     </>
                   ) : (
                     <>
                       <Copy className="w-4 h-4" />
-                      <span>คัดลอก LIFF URL</span>
+                      <span>คัดลอกลิงก์ส่งต่อ</span>
                     </>
                   )}
                 </button>
@@ -830,996 +774,245 @@ export const LineIntegrationView: React.FC = () => {
                   href={generatedLiffUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
+                  className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1"
                 >
-                  <Smartphone className="w-3.5 h-3.5 text-amber-600" />
-                  <span>เปิดทดสอบ LIFF App</span>
+                  <span>เปิดทดลองบนเว็บ</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
                 </a>
               </div>
             </div>
 
-          </div>
-
-          {/* Interactive QR Code & Mobile Warehouse Access */}
-          <div className="bg-slate-900 p-6 rounded-2xl text-white shadow-sm border border-slate-800 grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
-            {/* Left Description */}
-            <div className="md:col-span-2 space-y-3">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/20 text-emerald-300 rounded-full text-xs font-bold border border-emerald-500/30">
-                <QrCode className="w-3.5 h-3.5" />
-                <span>Live QR Code สำหรับทดสอบบนมือถือทันที</span>
-              </div>
-              <h3 className="text-lg sm:text-xl font-bold">
-                สแกนเปิดระบบคลังสินค้าผ่าน LINE บนสมาร์ทโฟน
-              </h3>
-              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-xl">
-                เปิดแอป LINE ในโทรศัพท์มือถือของคุณ แล้วเปิดกล้องสแกน QR Code นี้ จะเปิดเข้าสู่หน้าจอ 
-                <strong> KASA WMS LIFF</strong> ซึ่งออกแบบมาให้พนักงานคลังสามารถสแกนบาร์โค้ด, เช็คสต๊อกคงเหลือ และบันทึกรับเข้า/ส่งออกได้ง่ายและรวดเร็วบนมือถือทันที
-              </p>
-
-              <div className="pt-2 flex flex-wrap items-center gap-3 text-xs">
-                <div className="px-3 py-1.5 bg-slate-800/90 rounded-lg text-slate-200 border border-slate-700 flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-400" />
-                  <span>รองรับทั้ง iOS และ Android</span>
-                </div>
-                <div className="px-3 py-1.5 bg-slate-800/90 rounded-lg text-slate-200 border border-slate-700 flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-400" />
-                  <span>ไม่ต้องติดตั้งแอปพลิเคชันเพิ่ม</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Right QR Code Card */}
-            <div className="flex flex-col items-center justify-center p-5 bg-white rounded-2xl shadow-lg text-slate-900 text-center">
-              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 shadow-inner">
+            <div className="flex flex-col items-center justify-center p-4 bg-slate-50 border border-slate-200 rounded-2xl text-center">
+              <div className="p-2.5 bg-white rounded-xl border border-slate-200 shadow-inner">
                 <QRCodeSVG
                   value={generatedLiffUrl}
-                  size={160}
-                  level="H"
+                  size={150}
+                  level="Q"
                   includeMargin={true}
                 />
               </div>
-              <p className="text-xs font-bold text-slate-900 mt-3">
-                สแกนเพื่อเปิด LINE LIFF
+              <p className="text-xs font-bold text-slate-900 mt-2.5">
+                สแกนด้วย LINE บนสมาร์ทโฟน
               </p>
-              <p className="font-mono text-[10px] text-slate-400 mt-0.5 truncate max-w-[200px]">
-                {generatedLiffUrl}
-              </p>
-            </div>
-          </div>
-
-          {/* 4-Step Connection Checklist */}
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-2xs space-y-4">
-            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-emerald-600" />
-              <span>สรุป 4 ขั้นตอนการนำลิงก์ไปใช้งาน (Checklist)</span>
-            </h3>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
-              <div className="p-4 bg-emerald-50/50 rounded-xl border border-emerald-200/80 space-y-2">
-                <span className="font-bold text-emerald-800 flex items-center gap-1.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <span>ขั้นตอนที่ 1: ตั้ง Webhook</span>
-                </span>
-                <p className="text-slate-600 leading-relaxed">
-                  ไปที่ <strong>Messaging API</strong> &gt; วาง <strong>Webhook URL</strong> &gt; เปิดสวิตช์ <strong>Use Webhook: ON</strong> แล้วกด <strong>Verify</strong>
-                </p>
-              </div>
-
-              <div className="p-4 bg-sky-50/50 rounded-xl border border-sky-200/80 space-y-2">
-                <span className="font-bold text-sky-800 flex items-center gap-1.5">
-                  <CheckCircle2 className="w-4 h-4 text-sky-600" />
-                  <span>ขั้นตอนที่ 2: สร้าง LIFF App</span>
-                </span>
-                <p className="text-slate-600 leading-relaxed">
-                  ไปที่แท็บ <strong>LIFF</strong> ใน LINE Developers &gt; กด <strong>Add</strong> &gt; ใส่ชื่อแอป &gt; ขนาด Full หรือ Tall &gt; วาง <strong>Endpoint URL</strong>
-                </p>
-              </div>
-
-              <div className="p-4 bg-amber-50/50 rounded-xl border border-amber-200/80 space-y-2">
-                <span className="font-bold text-amber-800 flex items-center gap-1.5">
-                  <CheckCircle2 className="w-4 h-4 text-amber-600" />
-                  <span>ขั้นตอนที่ 3: ระบุ LIFF ID</span>
-                </span>
-                <p className="text-slate-600 leading-relaxed">
-                  เมื่อสร้าง LIFF เสร็จ จะได้รับ <strong>LIFF ID</strong> ให้นำมากรอกในช่อง <strong>LIFF ID</strong> ด้านบน เพื่อให้ลิงก์ LIFF App อัปเดตสมบูรณ์
-                </p>
-              </div>
-
-              <div className="p-4 bg-purple-50/50 rounded-xl border border-purple-200/80 space-y-2">
-                <span className="font-bold text-purple-800 flex items-center gap-1.5">
-                  <CheckCircle2 className="w-4 h-4 text-purple-600" />
-                  <span>ขั้นตอนที่ 4: เชื่อมกับ Rich Menu</span>
-                </span>
-                <p className="text-slate-600 leading-relaxed">
-                  นำ <strong>LIFF App URL</strong> ไปใส่ในปุ่ม Rich Menu ของ LINE OA เพื่อให้พนักงานกดเปิดระบบคลังสินค้าได้จากห้องแชทของ LINE ทันที
-                </p>
-              </div>
             </div>
           </div>
 
         </div>
       )}
 
-      {/* ================= TAB 1: WEBHOOK LIVE LOGS & INSPECTOR ================= */}
+      {/* ================= TAB 3: PROLOGUED LOGS VIEW ================= */}
       {activeTab === 'logs' && (
         <div className="space-y-6">
-
-          {/* Quick Metrics Cards */}
+          
+          {/* Metrics summary cards */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-slate-500">เหตุการณ์ทั้งหมด</span>
-                <Activity className="w-4 h-4 text-emerald-600" />
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-3xs">
+              <div className="flex items-center justify-between text-slate-500">
+                <span className="text-xs font-bold">กิจกรรมทั้งหมด</span>
+                <Activity className="w-4 h-4 text-slate-600" />
               </div>
-              <p className="text-2xl font-bold text-slate-900 mt-1">{logs.length}</p>
-              <p className="text-[11px] text-slate-400 mt-0.5">รวมทุกคำขอที่เข้ามา</p>
+              <p className="text-xl font-bold text-slate-900 mt-1">{logs.length}</p>
+              <p className="text-[10px] text-slate-400">รายการที่เซิร์ฟเวอร์จับได้</p>
             </div>
 
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-slate-500">ข้อความที่ได้รับ</span>
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-3xs">
+              <div className="flex items-center justify-between text-blue-500">
+                <span className="text-xs font-bold">ข้อความที่ส่งเข้า (Chat)</span>
                 <MessageSquare className="w-4 h-4 text-blue-600" />
               </div>
-              <p className="text-2xl font-bold text-blue-600 mt-1">{messageCount}</p>
-              <p className="text-[11px] text-slate-400 mt-0.5">จากแชตส่วนตัวและกลุ่ม</p>
+              <p className="text-xl font-bold text-blue-600 mt-1">{messageCount}</p>
+              <p className="text-[10px] text-slate-400">จากทั้งแชตส่วนตัวและกลุ่ม</p>
             </div>
 
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-slate-500">เชิญเข้ากลุ่ม (Group Joins)</span>
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-3xs">
+              <div className="flex items-center justify-between text-purple-500">
+                <span className="text-xs font-bold">บอทเข้ากลุ่ม (Joins)</span>
                 <Users className="w-4 h-4 text-purple-600" />
               </div>
-              <p className="text-2xl font-bold text-purple-600 mt-1">{joinCount}</p>
-              <p className="text-[11px] text-slate-400 mt-0.5">พร้อมตรวจจับ Group ID</p>
+              <p className="text-xl font-bold text-purple-600 mt-1">{joinCount}</p>
+              <p className="text-[10px] text-slate-400">ตรวจจับเก็บ Group ID</p>
             </div>
 
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-slate-500">เพิ่มเพื่อน (Followers)</span>
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-3xs">
+              <div className="flex items-center justify-between text-amber-500">
+                <span className="text-xs font-bold">เพื่อนติดตามใหม่ (Follows)</span>
                 <User className="w-4 h-4 text-amber-600" />
               </div>
-              <p className="text-2xl font-bold text-amber-600 mt-1">{followCount}</p>
-              <p className="text-[11px] text-slate-400 mt-0.5">ผู้ใช้ใหม่ที่กดติดตาม</p>
+              <p className="text-xl font-bold text-amber-600 mt-1">{followCount}</p>
+              <p className="text-[10px] text-slate-400">สถิติคนเพิ่มเพื่อนบอท</p>
             </div>
           </div>
 
-          {/* Simulation & Testing Panel */}
-          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-emerald-600" />
-                เครื่องมือทดสอบจำลอง Event ทันที (Interactive Event Simulator)
-              </span>
-              <span className="text-[11px] text-slate-500">
-                สามารถกดทดสอบเพื่อดูการแสดงผลของ log ได้ทันทีโดยไม่ต้องรอข้อความจริง
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {/* Test Message */}
-              <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    <MessageSquare className="w-3.5 h-3.5 text-blue-600" />
-                    จำลอง "ผู้ใช้ส่งข้อความ"
-                  </span>
-                </div>
-                <input
-                  type="text"
-                  value={simMessageText}
-                  onChange={(e) => setSimMessageText(e.target.value)}
-                  placeholder="ข้อความที่ต้องการทดสอบ..."
-                  className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800"
-                />
-                <button
-                  onClick={() => handleSimulateEvent('message')}
-                  disabled={simulating}
-                  className="w-full py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
-                >
-                  <Play className="w-3 h-3" />
-                  <span>ยิงเหตุการณ์จำลอง Message</span>
-                </button>
-              </div>
-
-              {/* Test Group Join */}
-              <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    <Users className="w-3.5 h-3.5 text-purple-600" />
-                    จำลอง "บอทถูกดึงเข้ากลุ่ม LINE"
-                  </span>
-                </div>
-                <input
-                  type="text"
-                  value={simGroupName}
-                  onChange={(e) => setSimGroupName(e.target.value)}
-                  placeholder="ชื่อกลุ่ม LINE..."
-                  className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800"
-                />
-                <button
-                  onClick={() => handleSimulateEvent('group_join')}
-                  disabled={simulating}
-                  className="w-full py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
-                >
-                  <Play className="w-3 h-3" />
-                  <span>ยิงเหตุการณ์จำลอง Group Join</span>
-                </button>
-              </div>
-
-              {/* Test Follow / Clear */}
-              <div className="p-3 bg-white rounded-xl border border-slate-200 flex flex-col justify-between space-y-2">
-                <div>
-                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    <User className="w-3.5 h-3.5 text-amber-600" />
-                    จำลอง "ผู้ใช้เพิ่มเพื่อน (Follow)"
-                  </span>
-                  <p className="text-[11px] text-slate-500 mt-1">
-                    ทดสอบ Event เมื่อมีผู้ใช้กดติดตามบัญชี LINE OA
-                  </p>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    onClick={() => handleSimulateEvent('follow')}
-                    disabled={simulating}
-                    className="py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition-all"
-                  >
-                    <Play className="w-3 h-3" />
-                    <span>จำลอง Follow</span>
-                  </button>
-                  <button
-                    onClick={handleClearLogs}
-                    className="py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition-all"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                    <span>ล้าง Logs ทั้งหมด</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Logs Filter Tabs */}
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-1.5">
+          {/* Filtering & Operations bar */}
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-3xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            
+            {/* Filter buttons */}
+            <div className="flex flex-wrap items-center gap-1.5">
               {[
                 { id: 'all', label: 'ทั้งหมด', count: logs.length },
                 { id: 'message', label: 'ข้อความเข้า', count: messageCount },
-                { id: 'join', label: 'เข้ากลุ่ม / ออกกลุ่ม', count: joinCount },
-                { id: 'follow', label: 'เพิ่มเพื่อน', count: followCount },
-                { id: 'verify', label: 'Webhook Verify', count: logs.filter(l => l.eventType === 'verify').length }
+                { id: 'join', label: 'การจัดการกลุ่ม', count: joinCount },
+                { id: 'follow', label: 'ผู้ใช้ติดตาม', count: followCount },
+                { id: 'verify', label: 'คำขอ Verify', count: logs.filter(l => l.eventType === 'verify').length }
               ].map(tab => (
                 <button
                   key={tab.id}
                   onClick={() => setFilterType(tab.id)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                     filterType === tab.id
                       ? 'bg-slate-900 text-white shadow-xs'
-                      : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                      : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
                   }`}
                 >
                   <span>{tab.label}</span>
-                  <span className="ml-1.5 text-[10px] opacity-75 font-mono">({tab.count})</span>
+                  <span className="ml-1 px-1 bg-slate-200 text-slate-800 rounded-full text-[9px] font-bold">
+                    {tab.count}
+                  </span>
                 </button>
               ))}
             </div>
 
-            <span className="text-[11px] text-slate-500 flex items-center gap-1">
-              <Clock className="w-3.5 h-3.5 text-slate-400" />
-              เรียงจากเหตุการณ์ล่าสุด
-            </span>
+            {/* Clear database logs button */}
+            <button
+              onClick={handleClearLogs}
+              disabled={logs.length === 0}
+              className="px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all disabled:opacity-40"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>ล้างประวัติเครื่องรับชั่วคราว</span>
+            </button>
           </div>
 
-          {/* Event Logs List */}
-          <div className="space-y-3">
+          {/* Webhook logs list */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
+            <div className="px-5 py-4 bg-slate-50 border-b border-slate-200/60 flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-800">รายการ Log กิจกรรมจาก Webhook</span>
+              <span className="text-[10px] text-slate-400">คลิกที่แถวรายการเพื่อคลี่ขยายดูข้อมูล JSON Payload ที่ได้รับจาก LINE</span>
+            </div>
+
             {filteredLogs.length === 0 ? (
-              <div className="bg-white p-12 text-center rounded-2xl border border-slate-200">
-                <Radio className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-                <h4 className="text-sm font-bold text-slate-800">ยังไม่มีเหตุการณ์ในหมวดหมู่นี้</h4>
-                <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
-                  เมื่อ LINE Developers ส่ง Webhook เข้ามา หรือเมื่อผู้ใช้ส่งข้อความ/เชิญเข้ากลุ่ม 
-                  ข้อมูลและรายละเอียดทั้งหมดจะแสดงที่นี่โดยอัตโนมัติ
+              <div className="p-12 text-center text-slate-400 space-y-2">
+                <Radio className="w-10 h-10 text-slate-300 mx-auto animate-pulse" />
+                <p className="text-xs font-bold text-slate-600">ยังไม่ได้รับสัญญาณกิจกรรมใดๆ จาก LINE ในช่วงนี้</p>
+                <p className="text-[11px] text-slate-400 max-w-sm mx-auto">
+                  เมื่อระบบของคุณได้รับความเคลื่อนไหว (เช่น มีคนพิมพ์ข้อหาบอท หรือดึงบอทเข้ากลุ่ม) กิจกรรมนั้นจะมาอัปเดตตรงนี้ให้ทันทีแบบเรียลไทม์!
                 </p>
-                <button
-                  onClick={() => handleSimulateEvent('message')}
-                  className="mt-4 px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-semibold inline-flex items-center gap-2"
-                >
-                  <Play className="w-3.5 h-3.5" />
-                  <span>ทดสอบยิง Event จำลองเพื่อดูตัวอย่าง</span>
-                </button>
               </div>
             ) : (
-              filteredLogs.map(log => {
-                const isExpanded = expandedLogId === log.id;
-                const formattedTime = new Date(log.timestamp).toLocaleString('th-TH', {
-                  year: 'numeric',
-                  month: 'short',
-                  day: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  second: '2-digit'
-                });
+              <div className="divide-y divide-slate-100">
+                {filteredLogs.map(log => {
+                  const isExpanded = expandedLogId === log.id;
+                  
+                  // Render badge based on eventType / status
+                  let statusColor = 'bg-slate-100 text-slate-800 border-slate-200';
+                  if (log.status === 'SUCCESS') statusColor = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                  if (log.status === 'WARNING') statusColor = 'bg-amber-50 text-amber-700 border-amber-200 border';
+                  if (log.eventType === 'message') statusColor = 'bg-blue-50 text-blue-700 border-blue-200';
 
-                return (
-                  <div
-                    key={log.id}
-                    className={`bg-white rounded-2xl border transition-all duration-200 shadow-2xs overflow-hidden ${
-                      log.eventType === 'join' 
-                        ? 'border-purple-200 hover:border-purple-300' 
-                        : log.eventType === 'message'
-                        ? 'border-blue-200 hover:border-blue-300'
-                        : log.eventType === 'verify'
-                        ? 'border-emerald-200 hover:border-emerald-300'
-                        : 'border-slate-200 hover:border-slate-300'
-                    }`}
-                  >
-                    {/* Log Item Header */}
-                    <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
-                      <div className="flex items-center gap-3">
-                        {/* Event Type Icon Badge / User Profile Avatar */}
-                        {log.userPictureUrl ? (
-                          <div className="relative shrink-0 w-10 h-10">
-                            <img
-                              src={log.userPictureUrl}
-                              alt="LINE Profile"
-                              className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-xs"
-                              referrerPolicy="no-referrer"
-                            />
-                            {/* Mini event type icon badge overlay */}
-                            <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-white border border-white shadow-xs ${
-                              log.eventType === 'message' 
-                                ? 'bg-blue-600' 
-                                : log.eventType === 'join' 
-                                ? 'bg-purple-600'
-                                : log.eventType === 'follow'
-                                ? 'bg-amber-500'
-                                : log.eventType === 'leave' || log.eventType === 'unfollow'
-                                ? 'bg-rose-600'
-                                : 'bg-emerald-600'
-                            }`}>
-                              {log.eventType === 'message' && <MessageSquare className="w-2.5 h-2.5" />}
-                              {log.eventType === 'join' && <Users className="w-2.5 h-2.5" />}
-                              {log.eventType === 'follow' && <User className="w-2.5 h-2.5" />}
-                              {log.eventType === 'verify' && <Activity className="w-2.5 h-2.5" />}
-                              {log.eventType !== 'message' && log.eventType !== 'join' && log.eventType !== 'follow' && log.eventType !== 'verify' && <Radio className="w-2.5 h-2.5" />}
-                            </div>
-                          </div>
-                        ) : (
-                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                            log.eventType === 'message' 
-                              ? 'bg-blue-100 text-blue-700' 
-                              : log.eventType === 'join' 
-                              ? 'bg-purple-100 text-purple-700'
-                              : log.eventType === 'follow'
-                              ? 'bg-amber-100 text-amber-700'
-                              : log.eventType === 'leave' || log.eventType === 'unfollow'
-                              ? 'bg-rose-100 text-rose-700'
-                              : 'bg-emerald-100 text-emerald-700'
-                          }`}>
-                            {log.eventType === 'message' && <MessageSquare className="w-4 h-4" />}
-                            {log.eventType === 'join' && <Users className="w-4 h-4" />}
-                            {log.eventType === 'follow' && <User className="w-4 h-4" />}
-                            {log.eventType === 'verify' && <Activity className="w-4 h-4" />}
-                            {log.eventType !== 'message' && log.eventType !== 'join' && log.eventType !== 'follow' && log.eventType !== 'verify' && <Radio className="w-4 h-4" />}
-                          </div>
-                        )}
+                  return (
+                    <div key={log.id} className="transition-all">
+                      
+                      {/* Accordion header line */}
+                      <div 
+                        onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
+                        className="px-5 py-3.5 hover:bg-slate-50/70 flex items-start gap-4 cursor-pointer select-none text-xs"
+                      >
+                        {/* Time columns */}
+                        <div className="text-[11px] font-semibold text-slate-400 shrink-0 mt-0.5 flex items-center gap-1 font-mono">
+                          <Clock className="w-3 h-3 text-slate-400 shrink-0" />
+                          <span>{new Date(log.timestamp).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+                        </div>
 
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide ${
-                              log.eventType === 'message'
-                                ? 'bg-blue-100 text-blue-800'
-                                : log.eventType === 'join'
-                                ? 'bg-purple-100 text-purple-800'
-                                : log.eventType === 'follow'
-                                ? 'bg-amber-100 text-amber-800'
-                                : log.eventType === 'verify'
-                                ? 'bg-emerald-100 text-emerald-800'
-                                : 'bg-slate-200 text-slate-800'
-                            }`}>
-                              {log.eventType === 'message' && '💬 ข้อความเข้า (MESSAGE)'}
-                              {log.eventType === 'join' && '🎉 เชิญเข้ากลุ่ม (GROUP JOIN)'}
-                              {log.eventType === 'leave' && '🚪 ออกจากกลุ่ม (LEAVE)'}
-                              {log.eventType === 'follow' && '👤 ผู้ใช้เพิ่มเพื่อน (FOLLOW)'}
-                              {log.eventType === 'unfollow' && '🚫 บล็อก/ยกเลิกเพื่อน (UNFOLLOW)'}
-                              {log.eventType === 'verify' && '⚡ ตรวจสอบ WEBHOOK (PING)'}
-                              {log.eventType === 'memberJoined' && '👥 สมาชิกเข้ากลุ่ม (MEMBER JOIN)'}
-                            </span>
+                        {/* Status / Badge */}
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${statusColor} uppercase shrink-0`}>
+                          {log.eventType}
+                        </span>
 
-                            <span className="text-[11px] text-slate-400 font-mono">
-                              {formattedTime}
-                            </span>
-                          </div>
+                        {/* Main Message details */}
+                        <div className="flex-1 space-y-1 min-w-0">
+                          <p className="font-bold text-slate-800 break-words leading-relaxed">
+                            {log.details}
+                          </p>
 
-                          <div className="flex flex-col sm:flex-row sm:items-center gap-x-3 gap-y-1 mt-1">
-                            <h4 className="text-xs sm:text-sm font-bold text-slate-900">
-                              {log.details}
-                            </h4>
-                            {log.statusMessage && (
-                              <span className="text-[10px] text-slate-500 font-medium bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full inline-flex items-center gap-1 shrink-0 w-max">
-                                <Sparkles className="w-2.5 h-2.5 text-amber-500" />
-                                สถานะไลน์: {log.statusMessage}
+                          {/* Secondary info row */}
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-slate-400">
+                            {log.userName && (
+                              <span className="font-semibold text-slate-600 flex items-center gap-1">
+                                <User className="w-3 h-3 text-slate-400" />
+                                <span>โดย: {log.userName}</span>
+                              </span>
+                            )}
+                            {log.groupName && (
+                              <span className="font-semibold text-purple-600 flex items-center gap-1 bg-purple-50 px-1.5 py-0.5 rounded-md border border-purple-100">
+                                <Users className="w-3 h-3 text-purple-400" />
+                                <span>ในกลุ่ม: {log.groupName}</span>
+                              </span>
+                            )}
+                            {log.groupId && (
+                              <span className="font-mono bg-slate-50 border border-slate-150 px-1.5 py-0.5 rounded-md text-slate-500">
+                                GID: {log.groupId}
                               </span>
                             )}
                           </div>
                         </div>
-                      </div>
 
-                      {/* Right Action buttons */}
-                      <div className="flex items-center gap-2 self-end sm:self-center">
-                        <button
-                          onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
-                          className="px-2.5 py-1 text-xs text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 rounded-lg flex items-center gap-1 transition-all"
-                        >
-                          <Terminal className="w-3.5 h-3.5 text-slate-500" />
-                          <span>{isExpanded ? 'ซ่อน Payload' : 'ดู Payload'}</span>
-                          {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Detailed Cards for Message or Group */}
-                    <div className="p-4 border-t border-slate-100 space-y-3">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        
-                        {/* 1. SENDER INFORMATION (ผู้ส่งข้อความ) */}
-                        {log.userId && (
-                          <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
-                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                              <User className="w-3 h-3 text-blue-600" />
-                              ข้อมูลผู้ส่ง (Sender Profile)
-                            </span>
-                            <div className="flex items-center gap-2.5">
-                              {log.userPictureUrl ? (
-                                <img
-                                  src={log.userPictureUrl}
-                                  alt="Sender avatar"
-                                  className="w-8 h-8 rounded-full object-cover border border-slate-300"
-                                  referrerPolicy="no-referrer"
-                                />
-                              ) : (
-                                <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 font-bold text-xs flex items-center justify-center">
-                                  {log.userName ? log.userName[0] : 'U'}
-                                </div>
-                              )}
-                              <div className="min-w-0 flex-1">
-                                <p className="text-xs font-bold text-slate-900 truncate">
-                                  {log.userName || 'LINE User (ไม่ได้ระบุชื่อ)'}
-                                </p>
-                                <p className="text-[11px] font-mono text-slate-500 truncate select-all">
-                                  ID: {log.userId}
-                                </p>
-                              </div>
-                              <button
-                                onClick={() => handleCopy(log.userId!, `user-${log.id}`)}
-                                className="p-1.5 hover:bg-slate-200 rounded-md text-slate-500 transition-all"
-                                title="คัดลอก User ID"
-                              >
-                                {copiedUrl === `user-${log.id}` ? (
-                                  <Check className="w-3.5 h-3.5 text-emerald-600" />
-                                ) : (
-                                  <Copy className="w-3.5 h-3.5" />
-                                )}
-                              </button>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* 2. GROUP INFORMATION (ข้อมูลกลุ่ม LINE) */}
+                        {/* Quick Group ID apply button if it has groupId */}
                         {log.groupId && (
-                          <div className="p-3 bg-purple-50/70 rounded-xl border border-purple-200 space-y-1.5">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[10px] font-bold text-purple-700 uppercase tracking-wider flex items-center gap-1">
-                                <Users className="w-3 h-3 text-purple-700" />
-                                ข้อมูลกลุ่ม LINE (Target Group)
-                              </span>
-                              <button
-                                onClick={() => handleApplyGroupId(log.groupId!, log.groupName)}
-                                className="px-2 py-0.5 bg-purple-600 hover:bg-purple-700 text-white rounded text-[10px] font-bold transition-all"
-                              >
-                                ใช้ Group ID นี้แจ้งเตือน
-                              </button>
-                            </div>
-                            <div className="flex items-center gap-2.5">
-                              {log.groupPictureUrl ? (
-                                <img
-                                  src={log.groupPictureUrl}
-                                  alt="Group avatar"
-                                  className="w-8 h-8 rounded-lg object-cover border border-purple-300"
-                                  referrerPolicy="no-referrer"
-                                />
-                              ) : (
-                                <div className="w-8 h-8 rounded-lg bg-purple-200 text-purple-800 font-bold text-xs flex items-center justify-center">
-                                  G
-                                </div>
-                              )}
-                              <div className="min-w-0 flex-1">
-                                <p className="text-xs font-bold text-purple-950 truncate">
-                                  {log.groupName || 'กลุ่ม LINE (ไม่ได้ตั้งชื่อ)'}
-                                </p>
-                                <p className="text-[11px] font-mono text-purple-700 truncate select-all">
-                                  ID: {log.groupId}
-                                </p>
-                              </div>
-                              <button
-                                onClick={() => handleCopy(log.groupId!, `group-${log.id}`)}
-                                className="p-1.5 hover:bg-purple-200 rounded-md text-purple-700 transition-all"
-                                title="คัดลอก Group ID"
-                              >
-                                {copiedUrl === `group-${log.id}` ? (
-                                  <Check className="w-3.5 h-3.5 text-emerald-600" />
-                                ) : (
-                                  <Copy className="w-3.5 h-3.5" />
-                                )}
-                              </button>
-                            </div>
-                          </div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleApplyGroupId(log.groupId!, log.groupName);
+                            }}
+                            className="px-2 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-lg text-[10px] font-bold shadow-3xs shrink-0 transition-all hidden sm:flex items-center gap-1"
+                          >
+                            <Database className="w-3 h-3" />
+                            <span>ใช้กลุ่มนี้แจ้งสต๊อก</span>
+                          </button>
                         )}
+
+                        <div className="text-slate-400 shrink-0 self-center">
+                          {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                        </div>
                       </div>
 
-                      {/* 3. MESSAGE CONTENT BUBBLE (ถ้ามีข้อความ) */}
-                      {log.messageText && (
-                        <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-1">
-                          <div className="flex items-center justify-between text-[10px] text-slate-400">
-                            <span className="font-semibold text-slate-600">
-                              เนื้อหาข้อความ ({log.messageType || 'text'}):
-                            </span>
-                            {log.replyToken && (
-                              <span className="font-mono">ReplyToken: {log.replyToken.slice(0, 10)}...</span>
-                            )}
-                          </div>
-                          <div className="p-2.5 bg-slate-50 rounded-lg text-xs font-medium text-slate-800 leading-relaxed">
-                            "{log.messageText}"
-                          </div>
-                        </div>
-                      )}
-
-                      {/* 4. EXPANDABLE RAW JSON PAYLOAD */}
+                      {/* Accordion body expand JSON */}
                       {isExpanded && (
-                        <div className="mt-2 p-3 bg-slate-900 rounded-xl text-slate-200 font-mono text-[11px] overflow-x-auto space-y-1.5">
-                          <div className="flex items-center justify-between text-slate-400 text-[10px] pb-1 border-b border-slate-800">
-                            <span>RAW WEBHOOK JSON FROM LINE DEVELOPERS</span>
+                        <div className="px-5 pb-5 pt-1.5 bg-slate-950 text-slate-300 font-mono text-[11px] space-y-3 border-t border-slate-800">
+                          
+                          {/* JSON Copy Button */}
+                          <div className="flex items-center justify-between text-slate-400 pb-2 border-b border-slate-800">
+                            <span className="text-[10px] font-sans">📄 RAW JSON PAYLOAD (ได้รับจาก LINE API)</span>
                             <button
-                              onClick={() => handleCopy(JSON.stringify(log.rawPayload, null, 2), `raw-${log.id}`)}
-                              className="text-slate-400 hover:text-white flex items-center gap-1"
+                              onClick={() => handleCopy(JSON.stringify(log.rawPayload, null, 2), `json-${log.id}`)}
+                              className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs transition-all flex items-center gap-1"
                             >
-                              <Copy className="w-3 h-3" />
-                              <span>{copiedUrl === `raw-${log.id}` ? 'คัดลอก JSON แล้ว' : 'คัดลอก JSON'}</span>
+                              {copiedUrl === `json-${log.id}` ? (
+                                <>
+                                  <Check className="w-3 h-3 text-emerald-400" />
+                                  <span className="text-emerald-400 font-bold">คัดลอก JSON แล้ว!</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-3 h-3 text-slate-400" />
+                                  <span>คัดลอกข้อมูล JSON</span>
+                                </>
+                              )}
                             </button>
                           </div>
-                          <pre className="max-h-60 overflow-y-auto">
+
+                          <pre className="overflow-x-auto max-h-80 leading-relaxed text-emerald-300/95 scrollbar-thin scrollbar-thumb-slate-800">
                             {JSON.stringify(log.rawPayload, null, 2)}
                           </pre>
                         </div>
                       )}
+
                     </div>
-                  </div>
-                );
-              })
+                  );
+                })}
+              </div>
             )}
           </div>
 
-        </div>
-      )}
-
-      {/* ================= TAB 2: LINE DEVELOPERS SETUP GUIDE ================= */}
-      {activeTab === 'setup' && (
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-2xs space-y-6">
-          <div className="pb-4 border-b border-slate-100">
-            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <ExternalLink className="w-5 h-5 text-blue-600" />
-              <span>ขั้นตอนการนำลิงก์ Webhook ไปใส่ใน LINE Developers Console</span>
-            </h3>
-            <p className="text-xs text-slate-500 mt-1">
-              ทำตามขั้นตอนง่ายๆ 4 ขั้นตอนนี้เพื่อให้ LINE Official Account เชื่อมต่อกับระบบคลังสินค้าได้สมบูรณ์
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            
-            {/* Step 1 */}
-            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="w-6 h-6 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center">
-                  1
-                </span>
-                <h4 className="text-xs font-bold text-slate-900">
-                  เข้าสู่ระบบ LINE Developers Console
-                </h4>
-              </div>
-              <p className="text-xs text-slate-600 leading-relaxed pl-8">
-                เปิดเว็บไซต์{' '}
-                <a 
-                  href="https://developers.line.biz/console/" 
-                  target="_blank" 
-                  rel="noreferrer"
-                  className="text-blue-600 font-bold hover:underline inline-flex items-center gap-0.5"
-                >
-                  developers.line.biz <ExternalLink className="w-3 h-3 inline" />
-                </a>
-                {' '}แล้วเข้าสู่ระบบด้วยบัญชี LINE ของคุณ จากนั้นเลือก **Provider** และ **Messaging API Channel** ที่ต้องการเชื่อมต่อ
-              </p>
-            </div>
-
-            {/* Step 2 */}
-            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="w-6 h-6 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center">
-                  2
-                </span>
-                <h4 className="text-xs font-bold text-slate-900">
-                  ไปที่แท็บ "Messaging API"
-                </h4>
-              </div>
-              <p className="text-xs text-slate-600 leading-relaxed pl-8">
-                คลิกเลือกแท็บ **Messaging API** ที่เมนูด้านบน แล้วเลื่อนลงมาที่หัวข้อ **Webhook settings**
-              </p>
-            </div>
-
-            {/* Step 3 */}
-            <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200 space-y-3">
-              <div className="flex items-center gap-2">
-                <span className="w-6 h-6 rounded-full bg-emerald-600 text-white font-bold text-xs flex items-center justify-center">
-                  3
-                </span>
-                <h4 className="text-xs font-bold text-emerald-950">
-                  กด Edit แล้ววาง Webhook URL นี้ลงไป
-                </h4>
-              </div>
-              <div className="pl-8 space-y-2">
-                <div className="p-2.5 bg-white border border-emerald-300 rounded-lg flex items-center justify-between gap-2">
-                  <span className="font-mono text-xs text-emerald-950 truncate select-all">
-                    {sharedWebhookUrl}
-                  </span>
-                  <button
-                    onClick={() => handleCopy(sharedWebhookUrl, 'guide-copy')}
-                    className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-bold shrink-0 flex items-center gap-1"
-                  >
-                    <Copy className="w-3 h-3" />
-                    <span>{copiedUrl === 'guide-copy' ? 'คัดลอกแล้ว' : 'คัดลอก'}</span>
-                  </button>
-                </div>
-                <p className="text-[11px] text-emerald-800">
-                  ⚠️ <strong>สำคัญมาก:</strong> ต้องเปิดสวิตช์ <strong>"Use webhook"</strong> ให้เป็นสีเขียว (ON) ด้วย
-                </p>
-              </div>
-            </div>
-
-            {/* Step 4 */}
-            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="w-6 h-6 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center">
-                  4
-                </span>
-                <h4 className="text-xs font-bold text-slate-900">
-                  กดปุ่ม "Verify" ใน LINE Developers
-                </h4>
-              </div>
-              <p className="text-xs text-slate-600 leading-relaxed pl-8">
-                เมื่อกดปุ่ม <strong>Verify</strong> ระบบจะส่งสัญญาณทดสอบมาที่เซิร์ฟเวอร์ของเรา และจะขึ้นสถานะ <strong>"Success"</strong> สีเขียวทันที
-                จากนั้นตรวจสอบที่แท็บ <strong>Webhook Live Logs</strong> ในหน้านี้ได้เลยครับ!
-              </p>
-            </div>
-
-          </div>
-
-          {/* Important Notice for LINE Webhook & 302 Error */}
-          <div className="p-4 bg-rose-50 rounded-xl border border-rose-200 flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
-            <div className="text-xs text-rose-950 leading-relaxed">
-              <p className="font-bold text-sm text-rose-900">
-                🚨 หาก LINE Developers ฟ้อง Error 302 Found (The webhook returned an HTTP status code other than 200)
-              </p>
-              <p className="mt-1">
-                <strong>สาเหตุ:</strong> ลิงก์ที่ขึ้นต้นด้วย <code>ais-pre-...</code> หรือ <code>ais-dev-...</code> เป็นลิงก์สำหรับ Preview ภายใน Google AI Studio ซึ่งมีระบบป้องกัน Cookie (Google Cookie Check 302) ทำให้ LINE Bot ที่ยิงเข้ามาจากภายนอกติดตัวกรองความปลอดภัยของ Google
-              </p>
-              <div className="mt-2.5 p-3 bg-white/80 rounded-lg border border-rose-300 space-y-1.5 text-slate-800">
-                <p className="font-bold text-emerald-800">✅ วิธีแก้ไขให้ LINE ตรวจสอบผ่าน 200 OK ได้ฟรี:</p>
-                <p>
-                  <strong>วิธีที่ 1 (แนะนำและฟรี 100%):</strong> กดปุ่ม <strong>Deploy to Cloud Run</strong> (หรือ Export to GitHub แล้ว Deploy ฟรีบน Vercel / Render) คุณจะได้รับ URL โดเมนสาธารณะถาวรจริง (เช่น <code>https://kasa-wms.run.app/api/line/webhook</code>) ซึ่งไม่มีระบบ Cookie Check และจะขึ้นสถานะ <strong>200 OK Success</strong> ทันที
-                </p>
-                <p>
-                  <strong>วิธีที่ 2 (ทดสอบในระบบตอนนี้):</strong> คุณสามารถใช้เครื่องมือ <strong>"Interactive Event Simulator"</strong> ในแท็บ Webhook Live Logs ด้านบน เพื่อจำลองข้อความเข้า และจำลองการเชิญบอทเข้ากลุ่มเพื่อดูฟังก์ชันการทำงานได้ทันที
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="p-4 bg-amber-50 rounded-xl border border-amber-200 flex items-start gap-3">
-            <Info className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-            <div className="text-xs text-amber-900 leading-relaxed">
-              <p className="font-bold">เคล็ดลับการดึง LINE Bot เข้ากลุ่ม:</p>
-              <p className="mt-0.5">
-                1. เชิญ LINE Official Account ของคุณเข้ากลุ่มพนักงานคลังสินค้า <br />
-                2. บอทจะส่ง Event <code>join</code> กลับมาที่ Webhook ทันที พร้อมแสดง <strong>Group ID</strong> ในแท็บ Logs <br />
-                3. คุณสามารถกดปุ่ม <strong>"ใช้ Group ID นี้แจ้งเตือน"</strong> ได้โดยตรง เพื่อให้บอทเริ่มส่งการแจ้งเตือนสินค้าเข้า-ออก เข้ากลุ่มนั้นทันทีครับ
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ================= TAB 3: CREDENTIALS & ALERT TRIGGERS ================= */}
-      {activeTab === 'config' && (
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-2xs space-y-6">
-          <form onSubmit={handleSaveConfig} className="space-y-5">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                <span>การตั้งค่า LINE Messaging API Credentials</span>
-              </h3>
-              <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-full">
-                Webhook Status: CONNECTED
-              </span>
-            </div>
-
-            {testSuccess && (
-              <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                <span>บันทึกการตั้งค่า LINE OA เรียบร้อยแล้ว!</span>
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  LINE Channel ID
-                </label>
-                <input
-                  type="text"
-                  value={channelId}
-                  onChange={(e) => setChannelId(e.target.value)}
-                  placeholder="เช่น 2001928374"
-                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-800"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  LINE Channel Secret
-                </label>
-                <input
-                  type="password"
-                  value={channelSecret}
-                  onChange={(e) => setChannelSecret(e.target.value)}
-                  placeholder="เช่น 4a8b7c9d0e1f2a3b4c5d6e7f8a9b0c1d"
-                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-800"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Channel Access Token (Long-lived)
-              </label>
-              <textarea
-                rows={2}
-                value={accessToken}
-                onChange={(e) => setAccessToken(e.target.value)}
-                placeholder="นำมาจากแท็บ Messaging API -> Channel access token (issue)"
-                className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-800"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  LINE LIFF ID (สำหรับแอปมือถือ)
-                </label>
-                <input
-                  type="text"
-                  value={liffId}
-                  onChange={(e) => setLiffId(e.target.value)}
-                  placeholder="เช่น 2001928374-xY9zL4a1"
-                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-mono text-emerald-800 font-bold"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Target Group ID (LINE Bot Group Target)
-                </label>
-                <input
-                  type="text"
-                  value={groupId}
-                  onChange={(e) => setGroupId(e.target.value)}
-                  placeholder="เช่น C12a34b56c78d90e1f23456789abcdef0"
-                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-800"
-                />
-                <p className="text-[10px] text-slate-400 mt-1">
-                  💡 แนะนำ: เชิญบอทเข้ากลุ่มแล้วคัดลอก Group ID จากแท็บ Webhook Logs ได้โดยตรง
-                </p>
-              </div>
-            </div>
-
-            {/* Event Notification Toggles */}
-            <div className="pt-4 border-t border-slate-100 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-xs text-slate-900 flex items-center gap-1.5">
-                  <Bell className="w-4 h-4 text-emerald-600" />
-                  เงื่อนไขการส่งแจ้งเตือนเข้ากลุ่ม Bot LINE (Alert Triggers)
-                </span>
-
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={lineConfig.lineBotEnabled}
-                    onChange={(e) => updateLineConfig({ lineBotEnabled: e.target.checked })}
-                    className="w-4 h-4 text-emerald-600 rounded-xs border-slate-300"
-                  />
-                  <span className="text-xs font-bold text-emerald-800">{t.line.toggleBot}</span>
-                </label>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                <label className="flex items-center gap-2.5 p-2.5 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={lineConfig.notifyInbound}
-                    onChange={(e) => updateLineConfig({ notifyInbound: e.target.checked })}
-                    className="w-4 h-4 text-emerald-600 rounded-xs"
-                  />
-                  <span className="text-slate-800 font-medium">1. แจ้งเตือนเมื่อรับสินค้าเข้า (Inbound)</span>
-                </label>
-
-                <label className="flex items-center gap-2.5 p-2.5 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={lineConfig.notifyOutbound}
-                    onChange={(e) => updateLineConfig({ notifyOutbound: e.target.checked })}
-                    className="w-4 h-4 text-sky-600 rounded-xs"
-                  />
-                  <span className="text-slate-800 font-medium">2. แจ้งเตือนเมื่อส่งออกสินค้า (Outbound)</span>
-                </label>
-
-                <label className="flex items-center gap-2.5 p-2.5 bg-amber-50 rounded-xl border border-amber-200 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={lineConfig.notifyLowStock}
-                    onChange={(e) => updateLineConfig({ notifyLowStock: e.target.checked })}
-                    className="w-4 h-4 text-amber-600 rounded-xs"
-                  />
-                  <span className="text-amber-900 font-bold">3. แจ้งเตือนสินค้าใกล้หมด (Low Stock)</span>
-                </label>
-
-                <label className="flex items-center gap-2.5 p-2.5 bg-rose-50 rounded-xl border border-rose-200 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={lineConfig.notifyDamaged}
-                    onChange={(e) => updateLineConfig({ notifyDamaged: e.target.checked })}
-                    className="w-4 h-4 text-rose-600 rounded-xs"
-                  />
-                  <span className="text-rose-900 font-bold">4. แจ้งเตือนสินค้าชำรุดเสียหาย (Damaged)</span>
-                </label>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end pt-3">
-              <button
-                type="submit"
-                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all"
-              >
-                บันทึกการตั้งค่า LINE OA
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* ================= TAB 4: SMARTPHONE LIFF PREVIEW ================= */}
-      {activeTab === 'mobile' && (
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-2xs flex flex-col items-center">
-          <div className="text-center mb-4">
-            <span className="text-sm font-bold text-slate-800 flex items-center justify-center gap-1.5">
-              <Smartphone className="w-5 h-5 text-emerald-600" />
-              {t.line.liffPreview}
-            </span>
-            <p className="text-xs text-slate-400 mt-1">
-              จำลองหน้าจอ LINE LIFF เมื่อพนักงานเปิดใช้งานบนสมาร์ทโฟน
-            </p>
-            <div className="mt-2 flex items-center justify-center gap-2">
-              <span className="font-mono text-xs text-slate-600 bg-slate-100 px-3 py-1 rounded-lg">
-                {liffUrl}
-              </span>
-              <button
-                onClick={() => handleCopy(liffUrl, 'liff')}
-                className="px-2.5 py-1 bg-slate-800 text-white rounded-lg text-xs font-medium flex items-center gap-1"
-              >
-                <Copy className="w-3 h-3" />
-                <span>{copiedUrl === 'liff' ? 'คัดลอกแล้ว' : 'คัดลอก LIFF'}</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Smartphone Shell */}
-          <div className="w-full max-w-[340px] bg-slate-900 rounded-[40px] p-3 shadow-2xl border-4 border-slate-800 relative">
-            
-            {/* Speaker notch */}
-            <div className="w-28 h-4 bg-slate-900 rounded-b-xl mx-auto absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center justify-center">
-              <div className="w-10 h-1 bg-slate-700 rounded-full"></div>
-            </div>
-
-            {/* Screen Content */}
-            <div className="bg-slate-100 rounded-[32px] overflow-hidden pt-6 pb-4 px-3 min-h-[580px] text-slate-800 flex flex-col justify-between relative">
-              
-              {/* LINE Header Bar */}
-              <div>
-                <div className="bg-emerald-600 text-white p-3 rounded-2xl flex items-center justify-between shadow-xs mb-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 bg-white/20 rounded-full flex items-center justify-center font-bold text-xs">
-                      K
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-xs">KASA WMS LIFF</h4>
-                      <p className="text-[9px] text-emerald-100">LINE Official Account Connected</p>
-                    </div>
-                  </div>
-                  <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse"></span>
-                </div>
-
-                {/* Simulated Notification Message inside LINE */}
-                <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs space-y-2 mb-3">
-                  <div className="flex items-center justify-between text-[10px] text-slate-400">
-                    <span className="font-semibold text-emerald-700">🟢 LINE Bot Group Alert</span>
-                    <span>10:30 น.</span>
-                  </div>
-                  <p className="text-xs font-bold text-slate-900">
-                    📦 แจ้งเตือน: รับเข้าสารส้มขุ่น 5,000 กก.
-                  </p>
-                  <p className="text-[11px] text-slate-600 leading-tight">
-                    • รหัสสินค้า: KASA-001 <br />
-                    • คลัง: WH-01 โซน A1 <br />
-                    • ผู้รับสินค้า: นภา เจริญคลัง <br />
-                    • ผู้ลงระบบ: สมชาย สายเคมี
-                  </p>
-                </div>
-
-                {/* Stock Quick Card inside Mobile View */}
-                <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs space-y-2">
-                  <h5 className="text-xs font-bold text-slate-900 flex items-center justify-between">
-                    <span>สินค้าใกล้หมด (Low Stock)</span>
-                    <span className="text-[10px] text-amber-600 font-bold bg-amber-50 px-1.5 py-0.5 rounded-xs">
-                      3 รายการ
-                    </span>
-                  </h5>
-
-                  <div className="space-y-1.5">
-                    {products.slice(0, 3).map(p => (
-                      <div key={p.id} className="p-2 bg-slate-50 rounded-xl text-[11px] flex items-center justify-between">
-                        <div>
-                          <p className="font-semibold text-slate-900">{p.name}</p>
-                          <p className="text-[9px] text-slate-400">{p.code}</p>
-                        </div>
-                        <span className="font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-md">
-                          เตือนที่ {p.minThreshold}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Mobile Footer Buttons */}
-              <div className="grid grid-cols-2 gap-2 mt-4 pt-2 border-t border-slate-200">
-                <button
-                  onClick={() => alert('เปิดแบบฟอร์มรับเข้าผ่าน LIFF')}
-                  className="py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold shadow-2xs flex items-center justify-center gap-1"
-                >
-                  <ArrowDownLeft className="w-3.5 h-3.5" />
-                  <span>รับสินค้าเข้า</span>
-                </button>
-
-                <button
-                  onClick={() => alert('เปิดแบบฟอร์มส่งออกผ่าน LIFF')}
-                  className="py-2 bg-sky-600 text-white rounded-xl text-xs font-bold shadow-2xs flex items-center justify-center gap-1"
-                >
-                  <ArrowUpRight className="w-3.5 h-3.5" />
-                  <span>เบิกส่งออก</span>
-                </button>
-              </div>
-
-            </div>
-
-          </div>
         </div>
       )}
 
