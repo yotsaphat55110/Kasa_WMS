@@ -85,6 +85,26 @@ const webhookLogs: LineWebhookLog[] = [
       status: 'ready',
       endpoint: '/api/line/webhook'
     }
+  },
+  {
+    id: 'log-seed-4',
+    timestamp: new Date(Date.now() - 900000).toISOString(),
+    eventType: 'follow',
+    sourceType: 'user',
+    userId: 'U11223344556677889900abcdefabcdef',
+    userName: 'คุณนพดล เจริญสุข (ผู้ผลิตสินค้า)',
+    userPictureUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=150',
+    statusMessage: 'จัดส่งวัตถุดิบและเคมีภัณฑ์ KASA Co.',
+    details: '👤 คุณ "นพดล เจริญสุข" ได้กดติดตาม / เพิ่มเพื่อนกับ LINE Official Account เรียบร้อยแล้ว',
+    status: 'SUCCESS',
+    rawPayload: {
+      type: 'follow',
+      timestamp: Date.now() - 900000,
+      source: {
+        type: 'user',
+        userId: 'U11223344556677889900abcdefabcdef'
+      }
+    }
   }
 ];
 

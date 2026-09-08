@@ -1138,24 +1138,53 @@ export const LineIntegrationView: React.FC = () => {
                     {/* Log Item Header */}
                     <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
                       <div className="flex items-center gap-3">
-                        {/* Event Type Icon Badge */}
-                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                          log.eventType === 'message' 
-                            ? 'bg-blue-100 text-blue-700' 
-                            : log.eventType === 'join' 
-                            ? 'bg-purple-100 text-purple-700'
-                            : log.eventType === 'follow'
-                            ? 'bg-amber-100 text-amber-700'
-                            : log.eventType === 'leave' || log.eventType === 'unfollow'
-                            ? 'bg-rose-100 text-rose-700'
-                            : 'bg-emerald-100 text-emerald-700'
-                        }`}>
-                          {log.eventType === 'message' && <MessageSquare className="w-4 h-4" />}
-                          {log.eventType === 'join' && <Users className="w-4 h-4" />}
-                          {log.eventType === 'follow' && <User className="w-4 h-4" />}
-                          {log.eventType === 'verify' && <Activity className="w-4 h-4" />}
-                          {log.eventType !== 'message' && log.eventType !== 'join' && log.eventType !== 'follow' && log.eventType !== 'verify' && <Radio className="w-4 h-4" />}
-                        </div>
+                        {/* Event Type Icon Badge / User Profile Avatar */}
+                        {log.userPictureUrl ? (
+                          <div className="relative shrink-0 w-10 h-10">
+                            <img
+                              src={log.userPictureUrl}
+                              alt="LINE Profile"
+                              className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-xs"
+                              referrerPolicy="no-referrer"
+                            />
+                            {/* Mini event type icon badge overlay */}
+                            <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-white border border-white shadow-xs ${
+                              log.eventType === 'message' 
+                                ? 'bg-blue-600' 
+                                : log.eventType === 'join' 
+                                ? 'bg-purple-600'
+                                : log.eventType === 'follow'
+                                ? 'bg-amber-500'
+                                : log.eventType === 'leave' || log.eventType === 'unfollow'
+                                ? 'bg-rose-600'
+                                : 'bg-emerald-600'
+                            }`}>
+                              {log.eventType === 'message' && <MessageSquare className="w-2.5 h-2.5" />}
+                              {log.eventType === 'join' && <Users className="w-2.5 h-2.5" />}
+                              {log.eventType === 'follow' && <User className="w-2.5 h-2.5" />}
+                              {log.eventType === 'verify' && <Activity className="w-2.5 h-2.5" />}
+                              {log.eventType !== 'message' && log.eventType !== 'join' && log.eventType !== 'follow' && log.eventType !== 'verify' && <Radio className="w-2.5 h-2.5" />}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                            log.eventType === 'message' 
+                              ? 'bg-blue-100 text-blue-700' 
+                              : log.eventType === 'join' 
+                              ? 'bg-purple-100 text-purple-700'
+                              : log.eventType === 'follow'
+                              ? 'bg-amber-100 text-amber-700'
+                              : log.eventType === 'leave' || log.eventType === 'unfollow'
+                              ? 'bg-rose-100 text-rose-700'
+                              : 'bg-emerald-100 text-emerald-700'
+                          }`}>
+                            {log.eventType === 'message' && <MessageSquare className="w-4 h-4" />}
+                            {log.eventType === 'join' && <Users className="w-4 h-4" />}
+                            {log.eventType === 'follow' && <User className="w-4 h-4" />}
+                            {log.eventType === 'verify' && <Activity className="w-4 h-4" />}
+                            {log.eventType !== 'message' && log.eventType !== 'join' && log.eventType !== 'follow' && log.eventType !== 'verify' && <Radio className="w-4 h-4" />}
+                          </div>
+                        )}
 
                         <div>
                           <div className="flex items-center gap-2">
@@ -1184,9 +1213,17 @@ export const LineIntegrationView: React.FC = () => {
                             </span>
                           </div>
 
-                          <h4 className="text-xs sm:text-sm font-bold text-slate-900 mt-1">
-                            {log.details}
-                          </h4>
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-x-3 gap-y-1 mt-1">
+                            <h4 className="text-xs sm:text-sm font-bold text-slate-900">
+                              {log.details}
+                            </h4>
+                            {log.statusMessage && (
+                              <span className="text-[10px] text-slate-500 font-medium bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full inline-flex items-center gap-1 shrink-0 w-max">
+                                <Sparkles className="w-2.5 h-2.5 text-amber-500" />
+                                สถานะไลน์: {log.statusMessage}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
 
