@@ -134,10 +134,10 @@ export const LoginView: React.FC = () => {
 
       {/* Main Login Content */}
       <main className="flex-1 flex items-center justify-center p-4 sm:p-6 relative z-10 my-auto">
-        <div className="w-full max-w-4xl grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+        <div className="w-full max-w-md">
           
-          {/* Left Column: Login Card (5 cols on lg) */}
-          <div className="lg:col-span-6 bg-slate-900/90 backdrop-blur-xl border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl flex flex-col justify-between relative overflow-hidden">
+          {/* Login Card */}
+          <div className="bg-slate-900/90 backdrop-blur-xl border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl flex flex-col justify-between relative overflow-hidden">
             
             {/* Top accent border */}
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-600 via-indigo-500 to-amber-500" />
@@ -291,100 +291,6 @@ export const LoginView: React.FC = () => {
                 <span>SSL Encrypted Connection</span>
               </span>
               <span>KASA Partnership Ltd.</span>
-            </div>
-
-          </div>
-
-          {/* Right Column: Quick Demo Users & Info (6 cols on lg) */}
-          <div className="lg:col-span-6 flex flex-col justify-between space-y-4">
-            
-            {/* Quick Demo User Switcher Card */}
-            <div className="bg-slate-900/70 border border-slate-800 rounded-3xl p-6 backdrop-blur-md">
-              <div className="flex items-center gap-2 mb-3">
-                <Sparkles className="w-4 h-4 text-amber-400" />
-                <h3 className="font-bold text-xs text-amber-300 uppercase tracking-wider">
-                  เลือกผู้ใช้งานสาธิต (Quick Login for Testing)
-                </h3>
-              </div>
-              <p className="text-xs text-slate-400 mb-4">
-                คลิกเลือกเจ้าหน้าที่ผู้ปฏิบัติงานด้านล่างเพื่อสลับบทบาทและเข้าใช้งานระบบได้ทันที:
-              </p>
-
-              <div className="space-y-2.5">
-                {activeUsers.map(user => (
-                  <button
-                    key={user.id}
-                    onClick={() => handleQuickLogin(user)}
-                    className="w-full bg-slate-950/80 hover:bg-slate-800/80 border border-slate-800 hover:border-blue-500/50 p-3 rounded-2xl text-left transition-all flex items-center justify-between group"
-                  >
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={user.avatarUrl}
-                        alt={user.firstName}
-                        className="w-10 h-10 rounded-xl object-cover border border-slate-700"
-                      />
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-bold text-xs text-white group-hover:text-blue-300 transition-colors">
-                            {user.firstName} {user.lastName}
-                          </h4>
-                          <span className={`px-2 py-0.5 text-[9px] font-mono font-bold rounded-md ${
-                            user.role === 'Admin' 
-                              ? 'bg-purple-900/60 text-purple-300 border border-purple-500/30' 
-                              : user.role === 'Stock Manager'
-                              ? 'bg-amber-900/60 text-amber-300 border border-amber-500/30'
-                              : 'bg-blue-900/60 text-blue-300 border border-blue-500/30'
-                          }`}>
-                            {user.role}
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-slate-400 font-mono mt-0.5">
-                          User: <strong className="text-blue-300">{user.username || user.employeeCode}</strong> | Pass: <strong className="text-amber-300">{user.password || '123456'}</strong>
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="px-3 py-1.5 bg-blue-600/10 group-hover:bg-blue-600 text-blue-400 group-hover:text-white rounded-xl text-xs font-semibold transition-all shrink-0">
-                      เข้าใช้งาน ➔
-                    </div>
-                  </button>
-                ))}
-
-                {/* Show Inactive User Demo Alert */}
-                {inactiveUsers.length > 0 && inactiveUsers[0] && (
-                  <div className="mt-3 p-3 bg-slate-950/40 border border-slate-800/80 rounded-2xl flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2 text-slate-400">
-                      <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
-                      <span>{inactiveUsers[0]?.firstName} {inactiveUsers[0]?.lastName} ({inactiveUsers[0]?.employeeCode})</span>
-                    </div>
-                    <span className="px-2 py-0.5 bg-rose-950/80 text-rose-300 border border-rose-800/50 rounded-md text-[10px] font-semibold">
-                      ระงับใช้งาน (Inactive)
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Warehouse Facilities Summary Card */}
-            <div className="bg-gradient-to-br from-slate-900/80 to-blue-950/40 border border-slate-800 rounded-3xl p-5">
-              <h4 className="text-xs font-bold text-slate-200 flex items-center gap-2 mb-2">
-                <Building2 className="w-4 h-4 text-blue-400" />
-                <span>คลังสินค้าและจุดจัดเก็บสารเคมี (KASA Facilities)</span>
-              </h4>
-              <div className="grid grid-cols-3 gap-2 text-center text-slate-300 text-[11px] font-medium pt-1">
-                <div className="p-2 bg-slate-950/60 border border-slate-800/80 rounded-xl">
-                  <p className="font-bold text-blue-400">WH-01</p>
-                  <p className="text-[10px] text-slate-400 truncate">คลังเคมีผง</p>
-                </div>
-                <div className="p-2 bg-slate-950/60 border border-slate-800/80 rounded-xl">
-                  <p className="font-bold text-amber-400">WH-02</p>
-                  <p className="text-[10px] text-slate-400 truncate">คลังเคมีเหลว</p>
-                </div>
-                <div className="p-2 bg-slate-950/60 border border-slate-800/80 rounded-xl">
-                  <p className="font-bold text-emerald-400">WH-03</p>
-                  <p className="text-[10px] text-slate-400 truncate">คลังบำบัดน้ำ</p>
-                </div>
-              </div>
             </div>
 
           </div>
