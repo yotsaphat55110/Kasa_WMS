@@ -66,6 +66,13 @@ export const GoogleSheetsDatabaseView: React.FC = () => {
   const [isCopiedCode, setIsCopiedCode] = useState(false);
   const [showCodePreview, setShowCodePreview] = useState(false);
 
+  // Sync inputs when server-loaded googleSheetsConfig updates
+  useEffect(() => {
+    setInputUrl(googleSheetsConfig.webAppUrl || '');
+    setSheetUrl(googleSheetsConfig.spreadsheetUrl || '');
+    setAutoSync(googleSheetsConfig.autoSync ?? true);
+  }, [googleSheetsConfig]);
+
   useEffect(() => {
     const unsub = initAuth(
       (user, token) => {
@@ -407,6 +414,18 @@ export const GoogleSheetsDatabaseView: React.FC = () => {
           </div>
         </div>
 
+        {/* Reassurance/Instruction banner about persistent login on standalone vs iFrame */}
+        <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-900 space-y-1.5 shadow-2xs">
+          <p className="font-bold flex items-center gap-2 text-blue-950">
+            <Info className="w-4 h-4 text-blue-600 shrink-0" />
+            <span>ทำไมสิทธิ์เข้าสู่ระบบ Google หลุดบ่อยเมื่อเปิดใช้งานในหน้า Preview ของ AI Studio?</span>
+          </p>
+          <p className="leading-relaxed">
+            ระบบความปลอดภัยของเบราว์เซอร์ยุคปัจจุบันจะทำการ <strong>บล็อกสิทธิ์การจดจำคุกกี้/ความจำระยะยาวในหน้าต่างจำลอง (iFrame preview)</strong> ทำให้เซสชันล็อกอินหลุดทุกครั้งเมื่อมีการรีเซ็ตหน้าจอ 
+            แต่เมื่อคุณเปิดใช้งานและเชื่อมต่อจากหน้าเว็บจริงบน <strong>Render URL (เช่น https://kasa-wms.onrender.com) โดยเปิดในแท็บแยกปกติ</strong> คุณจะเข้าสู่ระบบ Google <strong>เพียงครั้งเดียวเท่านั้นและจะคงสิทธิ์นั้นถาวร</strong> ไม่ต้องกดล็อกอินซ้ำๆ อีกต่อไปครับ!
+          </p>
+        </div>
+
         {/* Action Panel for Direct Sheet Creation */}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
           <div className="md:col-span-8 space-y-3">
@@ -614,6 +633,28 @@ export const GoogleSheetsDatabaseView: React.FC = () => {
             </h3>
 
             <div className="space-y-3">
+              {/* Step-by-step tutorial on how to get Google Apps Script Web App URL */}
+              <div className="p-3.5 bg-amber-50/70 border border-amber-200 rounded-xl space-y-2 text-[11px] text-amber-950 shadow-2xs">
+                <p className="font-bold flex items-center gap-1.5 text-xs text-amber-900">
+                  <Info className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>📍 วิธีเอา Web App URL ของ Google Apps Script มาใส่:</span>
+                </p>
+                <ol className="list-decimal pl-4.5 space-y-1.5 leading-relaxed">
+                  <li>เปิดไฟล์ <strong>Google Sheet</strong> ของคุณขึ้นมา</li>
+                  <li>คลิกเมนูบาร์ด้านบน <strong>ส่วนขยาย (Extensions)</strong> &gt; คลิกเลือก <strong>Apps Script</strong></li>
+                  <li>คัดลอกโค้ดจากกล่องสีดำ (ซ้ายมือของหน้านี้) ไปวางในหน้านั้นทั้งหมด และกดปุ่มเซฟ (ไอคอนรูปแผ่นดิสก์)</li>
+                  <li>คลิกปุ่มสีน้ำเงินด้านขวาบน <strong>การใช้บริการ (Deploy)</strong> &gt; เลือก <strong>การแจ้งใช้งานใหม่ (New deployment)</strong></li>
+                  <li>เลือกประเภท (รูปฟันเฟือง) เป็น <strong>เว็บแอป (Web app)</strong></li>
+                  <li>กำหนดค่าด้านล่าง:
+                    <ul className="list-disc pl-4 mt-0.5 space-y-0.5">
+                      <li>ผู้เรียกใช้ (Execute as) เป็น <strong>"ฉัน (Me)"</strong></li>
+                      <li>สิทธิ์เข้าถึง (Who has access) เป็น <strong>"ทุกคน (Anyone)"</strong> ⚠️ สำคัญมากเพื่อความลื่นไหล</li>
+                    </ul>
+                  </li>
+                  <li>กดปุ่ม <strong>ทำให้ใช้งานได้ (Deploy)</strong> แล้วระบบจะแสดง <strong>URL ของเว็บแอป (Web app URL)</strong> ที่ขึ้นต้นด้วย <code>https://script.google.com/macros/s/.../exec</code> ให้คัดลอกตัวนั้นมาวางในช่องข้างล่างนี้ครับ!</li>
+                </ol>
+              </div>
+
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   Google Apps Script Web App URL

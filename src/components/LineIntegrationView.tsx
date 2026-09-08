@@ -56,6 +56,16 @@ export const LineIntegrationView: React.FC = () => {
   const [testSuccess, setTestSuccess] = useState(false);
   const [sendingTest, setSendingTest] = useState(false);
 
+  // Sync inputs when server-loaded lineConfig updates
+  useEffect(() => {
+    setChannelId(lineConfig.channelId);
+    setChannelSecret(lineConfig.channelSecret);
+    setAccessToken(lineConfig.channelAccessToken);
+    setLiffId(lineConfig.liffId);
+    setGroupId(lineConfig.lineBotGroupId);
+    setCustomDeployedUrl(lineConfig.customDeployedUrl || '');
+  }, [lineConfig]);
+
   // Webhook Logs state
   const [logs, setLogs] = useState<LineWebhookLog[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
