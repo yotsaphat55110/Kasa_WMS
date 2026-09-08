@@ -206,6 +206,60 @@ async function startServer() {
     }
   });
 
+  // Google Sheets Proxy to completely bypass browser CORS restrictions
+  app.post('/api/sheets/proxy', async (req, res) => {
+    try {
+      const { webAppUrl, method, action, data } = req.body;
+      
+      if (!webAppUrl) {
+        return res.status(400).json({ success: false, message: 'Missing webAppUrl' });
+      }
+
+      if (method === 'GET') {
+        const pingUrl = webAppUrl.includes('?') ? `${webAppUrl}&action=${action}` : `${webAppUrl}?action=${action}`;
+        const response = await fetch(pingUrl);
+        const text = await response.text();
+        
+        let json;
+        try {
+          json = JSON.parse(text);
+        } catch {
+          return res.status(400).json({ 
+            success: false, 
+            message: 'เซิร์ฟเวอร์ Google Apps Script ตอบกลับข้อมูลที่ไม่ใช่ JSON', 
+            rawResponse: text 
+          });
+        }
+        
+        return res.json({ success: response.ok, data: json });
+      } else {
+        // POST method
+        const response = await fetch(webAppUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ action, data })
+        });
+        
+        const text = await response.text();
+        let json;
+        try {
+          json = JSON.parse(text);
+        } catch {
+          return res.status(400).json({ 
+            success: false, 
+            message: 'เซิร์ฟเวอร์ Google Apps Script ตอบกลับข้อมูลที่ไม่ใช่ JSON หลังทำรายการ', 
+            rawResponse: text 
+          });
+        }
+        
+        return res.json({ success: response.ok, data: json });
+      }
+    } catch (err: any) {
+      console.error('Sheets Proxy Error:', err);
+      return res.status(500).json({ success: false, message: err.message || 'Error occurred during proxy request' });
+    }
+  });
+
   // Load data store endpoint
   app.get('/api/data-store', (req, res) => {
     try {
