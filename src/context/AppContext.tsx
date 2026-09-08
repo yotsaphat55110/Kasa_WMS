@@ -93,6 +93,9 @@ interface AppContextType {
   getProductById: (id: string) => Product | undefined;
   getWarehouseById: (id: string) => Warehouse | undefined;
   getLowStockProducts: () => Array<{ product: Product; totalQty: number }>;
+
+  liffProfile: { userId: string; displayName: string; pictureUrl?: string } | null;
+  isLiffLoading: boolean;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -136,8 +139,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     const saved = localStorage.getItem('kasa_auth_status');
-    return saved !== null ? JSON.parse(saved) : true;
+    return saved !== null ? JSON.parse(saved) : false;
   });
+
+  const [liffProfile, setLiffProfile] = useState<{ userId: string; displayName: string; pictureUrl?: string } | null>(null);
+  const [isLiffLoading, setIsLiffLoading] = useState<boolean>(false);
 
   const [currentUser, setCurrentUser] = useState<User>(() => {
     const saved = localStorage.getItem('kasa_current_user');
@@ -488,6 +494,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           if (storeData.inventory) setInventory(storeData.inventory);
           if (storeData.inboundRecords) setInboundRecords(storeData.inboundRecords);
           if (storeData.outboundRecords) setOutboundRecords(storeData.outboundRecords);
+          if (storeData.users) setUsers(storeData.users);
         }
       } catch (err) {
         console.warn('Initial server sync failed:', err);
@@ -510,6 +517,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           if (storeData.inventory) setInventory(storeData.inventory);
           if (storeData.inboundRecords) setInboundRecords(storeData.inboundRecords);
           if (storeData.outboundRecords) setOutboundRecords(storeData.outboundRecords);
+          if (storeData.users) setUsers(storeData.users);
         }
 
         const configRes = await fetch('/api/config');
@@ -525,6 +533,59 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     return () => clearInterval(interval);
   }, []);
+
+  // LINE LIFF Initialization and Auto-Login Linkage
+  useEffect(() => {
+    const initLiff = async () => {
+      if (!lineConfig || !lineConfig.liffId) return;
+
+      setIsLiffLoading(true);
+      try {
+        const { default: liff } = await import('@line/liff');
+        await liff.init({ liffId: lineConfig.liffId });
+        
+        if (liff.isLoggedIn()) {
+          const profile = await liff.getProfile();
+          setLiffProfile({
+            userId: profile.userId,
+            displayName: profile.displayName,
+            pictureUrl: profile.pictureUrl
+          });
+
+          // Check if there is already a user linked to this LINE ID
+          const matchedUser = users.find(u => u.lineUserId === profile.userId);
+          if (matchedUser) {
+            if (matchedUser.status === 1) {
+              setCurrentUser(matchedUser);
+              setIsAuthenticated(true);
+              
+              // Add audit log for automatic login
+              const newLog: AuditLog = {
+                id: `log-${Date.now()}`,
+                timestamp: new Date().toISOString(),
+                userId: matchedUser.id,
+                employeeCode: matchedUser.employeeCode,
+                userName: `${matchedUser.firstName} ${matchedUser.lastName}`,
+                actionType: 'USER_LOGIN',
+                details: `เข้าสู่ระบบอัตโนมัติผ่าน LINE (LIFF) สำเร็จ`,
+                ipAddress: '127.0.0.1 (Cloud Run)'
+              };
+              setAuditLogs(prev => [newLog, ...prev]);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('LINE LIFF initialization failed:', err);
+      } finally {
+        setIsLiffLoading(false);
+      }
+    };
+
+    // Initialize when lineConfig has loaded
+    if (hasLoadedFromServer && lineConfig?.liffId) {
+      initLiff();
+    }
+  }, [lineConfig?.liffId, hasLoadedFromServer, users]);
 
   // 3. Save configurations to server whenever they change
   useEffect(() => {
@@ -558,7 +619,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             warehouses,
             inventory,
             inboundRecords,
-            outboundRecords
+            outboundRecords,
+            users
           })
         });
       } catch (err) {
@@ -566,7 +628,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
     };
     saveDataToServer();
-  }, [products, warehouses, inventory, inboundRecords, outboundRecords, hasLoadedFromServer]);
+  }, [products, warehouses, inventory, inboundRecords, outboundRecords, users, hasLoadedFromServer]);
 
   // --------------------------------------------------------
 
@@ -1127,7 +1189,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         markAllNotificationsRead,
         getProductById,
         getWarehouseById,
-        getLowStockProducts
+        getLowStockProducts,
+        liffProfile,
+        isLiffLoading
       }}
     >
       {children}

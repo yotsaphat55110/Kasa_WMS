@@ -26,6 +26,8 @@ export const UserModal: React.FC<UserModalProps> = ({
   const [phone, setPhone] = useState<string>('');
   const [status, setStatus] = useState<0 | 1>(1);
   const [role, setRole] = useState<User['role']>('Warehouse Officer');
+  const [lineUserId, setLineUserId] = useState<string>('');
+  const [lineDisplayName, setLineDisplayName] = useState<string>('');
 
   useEffect(() => {
     if (userToEdit) {
@@ -38,6 +40,8 @@ export const UserModal: React.FC<UserModalProps> = ({
       setPhone(userToEdit.phone);
       setStatus(userToEdit.status);
       setRole(userToEdit.role);
+      setLineUserId(userToEdit.lineUserId || '');
+      setLineDisplayName(userToEdit.lineDisplayName || '');
     } else {
       const code = `EMP-${Math.floor(100 + Math.random() * 900)}`;
       setEmployeeCode(code);
@@ -49,6 +53,8 @@ export const UserModal: React.FC<UserModalProps> = ({
       setPhone('');
       setStatus(1);
       setRole('Warehouse Officer');
+      setLineUserId('');
+      setLineDisplayName('');
     }
   }, [userToEdit, isOpen]);
 
@@ -68,7 +74,9 @@ export const UserModal: React.FC<UserModalProps> = ({
       email,
       phone,
       status,
-      role
+      role,
+      lineUserId: lineUserId.trim() || undefined,
+      lineDisplayName: lineDisplayName.trim() || undefined
     });
 
     onClose();
@@ -252,6 +260,43 @@ export const UserModal: React.FC<UserModalProps> = ({
                 <span className="px-2 py-0.5 bg-rose-100 text-rose-800 rounded-md font-bold">0 = ไม่ใช้งาน (Inactive)</span>
               </label>
             </div>
+          </div>
+
+          <div className="bg-slate-50 border border-slate-200 p-3 rounded-lg space-y-3">
+            <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+              การเชื่อมโยงบัญชี LINE (LINE Profile Integration)
+            </h4>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[10px] font-semibold text-slate-500 mb-1">
+                  LINE User ID (สำหรับยืนยันตน)
+                </label>
+                <input
+                  type="text"
+                  value={lineUserId}
+                  onChange={(e) => setLineUserId(e.target.value)}
+                  placeholder="เช่น U123456789abcdef..."
+                  className="w-full px-3 py-1.2 text-xs bg-white border border-slate-200 rounded-md font-mono text-slate-800 placeholder-slate-400 focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-semibold text-slate-500 mb-1">
+                  ชื่อ LINE (Display Name)
+                </label>
+                <input
+                  type="text"
+                  value={lineDisplayName}
+                  onChange={(e) => setLineDisplayName(e.target.value)}
+                  placeholder="เช่น Somchai LINE"
+                  className="w-full px-3 py-1.2 text-xs bg-white border border-slate-200 rounded-md text-slate-800 placeholder-slate-400 focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+            <p className="text-[10px] text-slate-400 leading-normal">
+              * ข้อมูลนี้จะเชื่อมโยงโดยอัตโนมัติเมื่อพนักงานเข้าใช้งานผ่านสมาร์ตโฟน (LINE LIFF) หรือสามารถระบุด้วยตนเองเพื่อเชื่อมต่อได้ทันที
+            </p>
           </div>
 
           {/* Footer */}

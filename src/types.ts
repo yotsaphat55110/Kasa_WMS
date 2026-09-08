@@ -106,6 +106,8 @@ export interface User {
   status: 0 | 1; // 5.6 Status (0 = ไม่ใช้งาน, 1 = ใช้งาน)
   role: 'Admin' | 'Stock Manager' | 'Warehouse Officer' | 'Inspector';
   avatarUrl?: string;
+  lineUserId?: string; // LINE User ID ผูกบัญชี
+  lineDisplayName?: string; // LINE Display Name
 }
 
 export interface AuditLog {

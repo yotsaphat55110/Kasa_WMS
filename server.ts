@@ -289,7 +289,7 @@ async function startServer() {
         const raw = fs.readFileSync(DATA_STORE_FILE, 'utf-8');
         return res.json(JSON.parse(raw));
       }
-      return res.json({ products: null, warehouses: null, inventory: null, inboundRecords: null, outboundRecords: null });
+      return res.json({ products: null, warehouses: null, inventory: null, inboundRecords: null, outboundRecords: null, users: null });
     } catch (err: any) {
       console.error('Error reading data store file:', err);
       return res.status(500).json({ success: false, error: err.message });
@@ -299,10 +299,10 @@ async function startServer() {
   // Save data store endpoint
   app.post('/api/data-store', (req, res) => {
     try {
-      const { products, warehouses, inventory, inboundRecords, outboundRecords } = req.body;
-      const data = { products, warehouses, inventory, inboundRecords, outboundRecords };
+      const { products, warehouses, inventory, inboundRecords, outboundRecords, users } = req.body;
+      const data = { products, warehouses, inventory, inboundRecords, outboundRecords, users };
       fs.writeFileSync(DATA_STORE_FILE, JSON.stringify(data, null, 2), 'utf-8');
-      return res.json({ success: true, message: 'บันทึกข้อมูลสินค้าและคลังบนเซิร์ฟเวอร์เรียบร้อย!' });
+      return res.json({ success: true, message: 'บันทึกข้อมูลคลังสินค้าและบัญชีพนักงานบนเซิร์ฟเวอร์เรียบร้อย!' });
     } catch (err: any) {
       console.error('Error writing data store file:', err);
       return res.status(500).json({ success: false, error: err.message });

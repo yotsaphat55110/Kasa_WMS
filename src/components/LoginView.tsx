@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 
 export const LoginView: React.FC = () => {
-  const { users, login, lineConfig } = useApp();
+  const { users, login, lineConfig, liffProfile, saveUser } = useApp();
 
   const [usernameInput, setUsernameInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
@@ -44,11 +44,26 @@ export const LoginView: React.FC = () => {
     setIsLoading(true);
 
     setTimeout(() => {
+      const query = usernameInput.trim().toLowerCase();
+      const userObj = users.find(u => 
+        (u.username && u.username.toLowerCase() === query) ||
+        u.employeeCode.toLowerCase() === query || 
+        u.email.toLowerCase() === query
+      );
+
       const res = login(usernameInput, passwordInput);
       setIsLoading(false);
 
       if (res.success) {
         setSuccessMessage(res.message);
+        if (liffProfile && userObj) {
+          saveUser({
+            ...userObj,
+            lineUserId: liffProfile.userId,
+            lineDisplayName: liffProfile.displayName
+          });
+          setSuccessMessage(prev => prev + '\n✓ ผูกบัญชี LINE เรียบร้อยแล้ว!');
+        }
       } else {
         setErrorMessage(res.message);
       }
@@ -71,6 +86,14 @@ export const LoginView: React.FC = () => {
 
       if (res.success) {
         setSuccessMessage(res.message);
+        if (liffProfile && user) {
+          saveUser({
+            ...user,
+            lineUserId: liffProfile.userId,
+            lineDisplayName: liffProfile.displayName
+          });
+          setSuccessMessage(prev => prev + '\n✓ ผูกบัญชี LINE เรียบร้อยแล้ว!');
+        }
       } else {
         setErrorMessage(res.message);
       }
@@ -135,6 +158,22 @@ export const LoginView: React.FC = () => {
               <p className="text-xs text-slate-400 mt-1">
                 กรอกรหัสพนักงาน หรือ อีเมล เพื่อเข้าสู่ระบบจัดการสต๊อกเคมีภัณฑ์
               </p>
+
+              {/* LINE Detection banner */}
+              {liffProfile && (
+                <div className="mt-4 p-3 bg-emerald-950/90 border border-emerald-500/40 rounded-2xl flex items-start gap-2.5 animate-fadeIn">
+                  <span className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold text-xs shrink-0 select-none">L</span>
+                  <div className="text-xs">
+                    <p className="font-bold text-emerald-300">พบการเข้าใช้งานผ่าน LINE</p>
+                    <p className="text-emerald-100 mt-0.5">
+                      คุณกำลังใช้ LINE: <strong className="font-bold text-white">{liffProfile.displayName}</strong>
+                    </p>
+                    <p className="text-slate-400 text-[11px] mt-1.5 leading-normal">
+                      กรุณาเข้าสู่ระบบด้วยรหัสพนักงาน/รหัสผ่านด้านล่าง เพื่อทำการผูกบัญชี LINE นี้เข้ากับโปรไฟล์พนักงานในระบบโดยอัตโนมัติ
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Alert Feedback Messages */}
               {errorMessage && (
@@ -221,6 +260,27 @@ export const LoginView: React.FC = () => {
                     </>
                   )}
                 </button>
+
+                {lineConfig?.liffId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      import('@line/liff').then(({ default: liff }) => {
+                        if (!liff.isLoggedIn()) {
+                          liff.login();
+                        } else {
+                          liff.getProfile().then(profile => {
+                            alert(`ล็อกอินด้วย LINE ในชื่อ ${profile.displayName} เรียบร้อยแล้ว`);
+                          });
+                        }
+                      });
+                    }}
+                    className="w-full mt-3 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2 transition-all"
+                  >
+                    <span className="w-4.5 h-4.5 rounded-full bg-white text-emerald-600 flex items-center justify-center font-black text-[10px] select-none shrink-0">L</span>
+                    <span>ล็อกอินด้วย LINE (LINE Login)</span>
+                  </button>
+                )}
               </form>
             </div>
 

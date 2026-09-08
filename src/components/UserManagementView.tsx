@@ -180,6 +180,18 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({
                     <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                     <span>{user.phone}</span>
                   </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-3.5 h-3.5 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold text-[8px] tracking-tighter shrink-0 select-none">L</span>
+                    {user.lineUserId ? (
+                      <span className="text-[11px] text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 truncate max-w-[190px]" title={user.lineUserId}>
+                        ผูกไลน์: {user.lineDisplayName || 'สำเร็จ'}
+                      </span>
+                    ) : (
+                      <span className="text-[11px] text-slate-400 bg-slate-50 border border-slate-100 px-2 py-0.5 rounded">
+                        LINE: ยังไม่เชื่อมโยง
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
