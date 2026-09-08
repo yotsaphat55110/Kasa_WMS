@@ -1,5 +1,6 @@
 import express from 'express';
 import path from 'path';
+import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 
 interface LineWebhookLog {
@@ -167,6 +168,69 @@ async function startServer() {
   // Health API
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', uptime: process.uptime(), time: new Date().toISOString() });
+  });
+
+  const CONFIG_FILE = path.join(process.cwd(), 'config-store.json');
+  const DATA_STORE_FILE = path.join(process.cwd(), 'data-store.json');
+
+  // Load configuration endpoint
+  app.get('/api/config', (req, res) => {
+    try {
+      if (fs.existsSync(CONFIG_FILE)) {
+        const raw = fs.readFileSync(CONFIG_FILE, 'utf-8');
+        return res.json(JSON.parse(raw));
+      }
+      return res.json({ lineConfig: null, googleSheetsConfig: null });
+    } catch (err: any) {
+      console.error('Error reading config file:', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Save configuration endpoint
+  app.post('/api/config', (req, res) => {
+    try {
+      const { lineConfig, googleSheetsConfig } = req.body;
+      const data = { lineConfig, googleSheetsConfig };
+      fs.writeFileSync(CONFIG_FILE, JSON.stringify(data, null, 2), 'utf-8');
+      
+      // Update in-memory active token for real-time Webhook log pushes
+      if (lineConfig?.channelAccessToken) {
+        activeLineChannelAccessToken = lineConfig.channelAccessToken;
+      }
+      
+      return res.json({ success: true, message: 'บันทึกข้อมูลการตั้งค่าบนเซิร์ฟเวอร์สำเร็จเรียบร้อย!' });
+    } catch (err: any) {
+      console.error('Error writing config file:', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Load data store endpoint
+  app.get('/api/data-store', (req, res) => {
+    try {
+      if (fs.existsSync(DATA_STORE_FILE)) {
+        const raw = fs.readFileSync(DATA_STORE_FILE, 'utf-8');
+        return res.json(JSON.parse(raw));
+      }
+      return res.json({ products: null, warehouses: null, inventory: null, inboundRecords: null, outboundRecords: null });
+    } catch (err: any) {
+      console.error('Error reading data store file:', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Save data store endpoint
+  app.post('/api/data-store', (req, res) => {
+    try {
+      const { products, warehouses, inventory, inboundRecords, outboundRecords } = req.body;
+      const data = { products, warehouses, inventory, inboundRecords, outboundRecords };
+      fs.writeFileSync(DATA_STORE_FILE, JSON.stringify(data, null, 2), 'utf-8');
+      return res.json({ success: true, message: 'บันทึกข้อมูลสินค้าและคลังบนเซิร์ฟเวอร์เรียบร้อย!' });
+    } catch (err: any) {
+      console.error('Error writing data store file:', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
   });
 
   // 1. GET /api/line/webhook (Verification status for browser tests)

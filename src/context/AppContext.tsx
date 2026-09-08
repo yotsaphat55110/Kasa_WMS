@@ -238,6 +238,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     };
   });
 
+  const [hasLoadedFromServer, setHasLoadedFromServer] = useState(false);
+
   // LocalStorage syncing
   useEffect(() => {
     localStorage.setItem('kasa_google_sheets_config', JSON.stringify(googleSheetsConfig));
@@ -458,6 +460,115 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   useEffect(() => {
     localStorage.setItem('kasa_language', language);
   }, [language]);
+
+  // --- SERVER SYNCHRONIZATION & MULTI-DEVICE PERSISTENCE ---
+
+  // 1. Load initial configs and data store from server on mount
+  useEffect(() => {
+    const initServerSync = async () => {
+      try {
+        // Load configurations
+        const configRes = await fetch('/api/config');
+        if (configRes.ok) {
+          const configData = await configRes.json();
+          if (configData.lineConfig) {
+            setLineConfig(configData.lineConfig);
+          }
+          if (configData.googleSheetsConfig) {
+            setGoogleSheetsConfig(configData.googleSheetsConfig);
+          }
+        }
+
+        // Load master data store
+        const storeRes = await fetch('/api/data-store');
+        if (storeRes.ok) {
+          const storeData = await storeRes.json();
+          if (storeData.products) setProducts(storeData.products);
+          if (storeData.warehouses) setWarehouses(storeData.warehouses);
+          if (storeData.inventory) setInventory(storeData.inventory);
+          if (storeData.inboundRecords) setInboundRecords(storeData.inboundRecords);
+          if (storeData.outboundRecords) setOutboundRecords(storeData.outboundRecords);
+        }
+      } catch (err) {
+        console.warn('Initial server sync failed:', err);
+      } finally {
+        // Flag that loading is done, so we can start listening for local changes to save back
+        setHasLoadedFromServer(true);
+      }
+    };
+
+    initServerSync();
+
+    // 2. Background polling (every 10 seconds) to fetch live changes made on other devices
+    const interval = setInterval(async () => {
+      try {
+        const storeRes = await fetch('/api/data-store');
+        if (storeRes.ok) {
+          const storeData = await storeRes.json();
+          if (storeData.products) setProducts(storeData.products);
+          if (storeData.warehouses) setWarehouses(storeData.warehouses);
+          if (storeData.inventory) setInventory(storeData.inventory);
+          if (storeData.inboundRecords) setInboundRecords(storeData.inboundRecords);
+          if (storeData.outboundRecords) setOutboundRecords(storeData.outboundRecords);
+        }
+
+        const configRes = await fetch('/api/config');
+        if (configRes.ok) {
+          const configData = await configRes.json();
+          if (configData.lineConfig) setLineConfig(configData.lineConfig);
+          if (configData.googleSheetsConfig) setGoogleSheetsConfig(configData.googleSheetsConfig);
+        }
+      } catch (err) {
+        console.warn('Background polling failed:', err);
+      }
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // 3. Save configurations to server whenever they change
+  useEffect(() => {
+    if (!hasLoadedFromServer) return;
+    
+    const saveConfigToServer = async () => {
+      try {
+        await fetch('/api/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lineConfig, googleSheetsConfig })
+        });
+      } catch (err) {
+        console.warn('Error saving config to server:', err);
+      }
+    };
+    saveConfigToServer();
+  }, [lineConfig, googleSheetsConfig, hasLoadedFromServer]);
+
+  // 4. Save data store to server whenever it changes
+  useEffect(() => {
+    if (!hasLoadedFromServer) return;
+
+    const saveDataToServer = async () => {
+      try {
+        await fetch('/api/data-store', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            products,
+            warehouses,
+            inventory,
+            inboundRecords,
+            outboundRecords
+          })
+        });
+      } catch (err) {
+        console.warn('Error saving data store to server:', err);
+      }
+    };
+    saveDataToServer();
+  }, [products, warehouses, inventory, inboundRecords, outboundRecords, hasLoadedFromServer]);
+
+  // --------------------------------------------------------
 
   const t = translations[language] || translations.th;
 
