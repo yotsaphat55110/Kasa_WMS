@@ -252,7 +252,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, [googleSheetsConfig]);
 
   const updateGoogleSheetsConfig = (partial: Partial<GoogleSheetsConfig>) => {
-    setGoogleSheetsConfig(prev => ({ ...prev, ...partial }));
+    setGoogleSheetsConfig(prev => {
+      const updated = { ...prev, ...partial };
+      if (hasLoadedFromServer) {
+        fetch('/api/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lineConfig, googleSheetsConfig: updated })
+        }).catch(err => console.warn('Error saving googleSheetsConfig to server:', err));
+      }
+      return updated;
+    });
   };
 
   const syncToGoogleSheets = async (): Promise<{ success: boolean; message: string }> => {
@@ -586,24 +596,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       initLiff();
     }
   }, [lineConfig?.liffId, hasLoadedFromServer, users]);
-
-  // 3. Save configurations to server whenever they change
-  useEffect(() => {
-    if (!hasLoadedFromServer) return;
-    
-    const saveConfigToServer = async () => {
-      try {
-        await fetch('/api/config', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ lineConfig, googleSheetsConfig })
-        });
-      } catch (err) {
-        console.warn('Error saving config to server:', err);
-      }
-    };
-    saveConfigToServer();
-  }, [lineConfig, googleSheetsConfig, hasLoadedFromServer]);
 
   // 4. Save data store to server whenever it changes
   useEffect(() => {
@@ -1088,7 +1080,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const updateLineConfig = (config: Partial<LineConfig>) => {
-    setLineConfig(prev => ({ ...prev, ...config }));
+    setLineConfig(prev => {
+      const updated = { ...prev, ...config };
+      if (hasLoadedFromServer) {
+        fetch('/api/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lineConfig: updated, googleSheetsConfig })
+        }).catch(err => console.warn('Error saving lineConfig to server:', err));
+      }
+      return updated;
+    });
     addAuditLog('LINE_CONFIG_UPDATE', 'อัปเดตการตั้งค่าการเชื่อมต่อ LINE OA และ Bot Notification');
   };
 
