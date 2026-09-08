@@ -24,7 +24,7 @@ import { UserModal } from './components/UserModal';
 import { InventoryItem, Product, User } from './types';
 
 const MainContent: React.FC = () => {
-  const { activeTab, isAuthenticated } = useApp();
+  const { activeTab, setActiveTab, isAuthenticated, currentUser } = useApp();
 
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -62,6 +62,12 @@ const MainContent: React.FC = () => {
 
   if (!isAuthenticated) {
     return <LoginView />;
+  }
+
+  // Redirect non-admins if they somehow land on a restricted tab
+  const isRestrictedTab = ['users', 'audit-log', 'line-oa', 'database'].includes(activeTab);
+  if (currentUser?.role !== 'Admin' && isRestrictedTab) {
+    setActiveTab('inventory');
   }
 
   return (

@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 
 export const Navigation: React.FC = () => {
-  const { activeTab, setActiveTab, t, notifications, inboundRecords, outboundRecords, lineConfig, googleSheetsConfig } = useApp();
+  const { activeTab, setActiveTab, t, notifications, inboundRecords, outboundRecords, lineConfig, googleSheetsConfig, currentUser } = useApp();
 
   const unreadNotifs = notifications.filter(n => !n.isRead).length;
 
@@ -81,6 +81,15 @@ export const Navigation: React.FC = () => {
     }
   ];
 
+  // Filter out Admin-only views for non-admin roles
+  const filteredNavItems = navItems.filter(item => {
+    const isAdminOnly = ['users', 'audit-log', 'line-oa', 'database'].includes(item.id);
+    if (isAdminOnly) {
+      return currentUser?.role === 'Admin';
+    }
+    return true;
+  });
+
   return (
     <>
       {/* Desktop Sidebar Navigation */}
@@ -104,7 +113,7 @@ export const Navigation: React.FC = () => {
 
           {/* Nav Items List */}
           <nav className="space-y-1 flex-1 overflow-y-auto pr-1">
-            {navItems.map(item => {
+            {filteredNavItems.map(item => {
               const isActive = activeTab === item.id;
               return (
                 <button
@@ -138,25 +147,27 @@ export const Navigation: React.FC = () => {
         </div>
 
         {/* LINE OA Widget Footer */}
-        <div className="p-4 border-t border-slate-100 bg-slate-50/50">
-          <div className="bg-green-50 p-3 rounded-lg border border-green-100">
-            <div className="flex items-center gap-2 mb-1">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-              <span className="text-[10px] uppercase font-bold text-green-700 tracking-wider">
-                LINE OA Connected
-              </span>
+        {currentUser?.role === 'Admin' && (
+          <div className="p-4 border-t border-slate-100 bg-slate-50/50">
+            <div className="bg-green-50 p-3 rounded-lg border border-green-100">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <span className="text-[10px] uppercase font-bold text-green-700 tracking-wider">
+                  LINE OA Connected
+                </span>
+              </div>
+              <p className="text-[11px] text-green-700 font-medium truncate">
+                Bot Active: <span className="font-semibold">{lineConfig.lineBotGroupId || 'Logistics_Group'}</span>
+              </p>
             </div>
-            <p className="text-[11px] text-green-700 font-medium truncate">
-              Bot Active: <span className="font-semibold">{lineConfig.lineBotGroupId || 'Logistics_Group'}</span>
-            </p>
           </div>
-        </div>
+        )}
       </aside>
 
       {/* Mobile Navigation Bottom Bar */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-200 px-2 py-1.5 shadow-lg">
-        <div className="grid grid-cols-4 sm:grid-cols-8 gap-1">
-          {navItems.map(item => {
+        <div className={`grid ${filteredNavItems.length <= 6 ? 'grid-cols-6' : 'grid-cols-4 sm:grid-cols-8'} gap-1`}>
+          {filteredNavItems.map(item => {
             const isActive = activeTab === item.id;
             return (
               <button
