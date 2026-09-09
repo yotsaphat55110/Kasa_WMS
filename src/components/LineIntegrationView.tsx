@@ -90,7 +90,7 @@ export const LineIntegrationView: React.FC = () => {
   const generatedWebhookUrl = `${activeBaseDomain}/api/line/webhook`;
   const generatedLiffEndpointUrl = `${activeBaseDomain}?mode=liff`;
   const cleanLiffId = (liffId || '').trim();
-  const generatedLiffUrl = cleanLiffId ? `https://liff.line.me/${cleanLiffId}` : `https://liff.line.me/2001928374-xY9zL4a1`;
+  const generatedLiffUrl = cleanLiffId ? `https://liff.line.me/${cleanLiffId}` : `https://liff.line.me/2011460480-vCyhI9lv`;
 
   // Fetch logs from Backend Express server
   const fetchWebhookLogs = useCallback(async () => {
