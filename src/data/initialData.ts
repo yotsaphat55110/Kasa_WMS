@@ -1185,9 +1185,9 @@ export const initialNotifications: NotificationAlert[] = [
 ];
 
 export const initialLineConfig: LineConfig = {
-  channelId: '1657891234',
-  channelSecret: '8f4c9a12b34e56789123456789abcdef',
-  channelAccessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.KASA_LINE_OA_DEFAULT_TOKEN_ACCESS_2026',
+  channelId: '2011457329',
+  channelSecret: 'ffa418a7578bb70237aaf9333cca481e',
+  channelAccessToken: 'kx4u8bZ6NfRUXpl0r3aZLF32/C82Ix4ONS4Qij5hgUyiQoS0Ceme/VMxAjLBvT3Yvs6gfFqgMS2fVgkORKiftpnwQRhnsJXKjjSnwC8Jt3F0rbE7dFAAb3EtHaGEZVsW9OkZC4gHTS6W5xEdL53XEgdB04t89/1O/w1cDnyilFU=',
   liffId: '2001928374-xY9zL4a1',
   lineBotGroupId: 'C8912a34b56c78901234567890abcdef',
   lineBotEnabled: true,
@@ -1195,5 +1195,6 @@ export const initialLineConfig: LineConfig = {
   notifyInbound: true,
   notifyOutbound: true,
   notifyDamaged: true,
-  webhookStatus: 'CONNECTED'
+  webhookStatus: 'CONNECTED',
+  customDeployedUrl: 'https://kasa-wms.onrender.com'
 };

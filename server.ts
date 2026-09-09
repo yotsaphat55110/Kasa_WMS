@@ -173,30 +173,87 @@ async function startServer() {
   const CONFIG_FILE = path.join(process.cwd(), 'config-store.json');
   const DATA_STORE_FILE = path.join(process.cwd(), 'data-store.json');
 
+  const DEFAULT_LINE_CONFIG = {
+    channelId: "2011457329",
+    channelSecret: "ffa418a7578bb70237aaf9333cca481e",
+    channelAccessToken: "kx4u8bZ6NfRUXpl0r3aZLF32/C82Ix4ONS4Qij5hgUyiQoS0Ceme/VMxAjLBvT3Yvs6gfFqgMS2fVgkORKiftpnwQRhnsJXKjjSnwC8Jt3F0rbE7dFAAb3EtHaGEZVsW9OkZC4gHTS6W5xEdL53XEgdB04t89/1O/w1cDnyilFU=",
+    liffId: "2001928374-xY9zL4a1",
+    lineBotGroupId: "C8912a34b56c78901234567890abcdef",
+    lineBotEnabled: true,
+    notifyLowStock: true,
+    notifyInbound: true,
+    notifyOutbound: true,
+    notifyDamaged: true,
+    webhookStatus: "CONNECTED",
+    customDeployedUrl: "https://kasa-wms.onrender.com"
+  };
+
+  const DEFAULT_SHEETS_CONFIG = {
+    webAppUrl: "",
+    spreadsheetUrl: "https://docs.google.com/spreadsheets/d/1Pupr2PZ5WOYA1bTh3mTEDdWRD13zdNc4mcgWrl5XFIo/edit",
+    autoSync: true,
+    syncStatus: "CONNECTED",
+    spreadsheetId: "1Pupr2PZ5WOYA1bTh3mTEDdWRD13zdNc4mcgWrl5XFIo",
+    spreadsheetTitle: "KASA WMS - ระบบสต๊อกสินค้าเคมีภัณฑ์",
+    lastSyncTime: new Date().toISOString()
+  };
+
+  // Seed CONFIG_FILE if not present
+  if (!fs.existsSync(CONFIG_FILE)) {
+    try {
+      fs.writeFileSync(CONFIG_FILE, JSON.stringify({
+        lineConfig: DEFAULT_LINE_CONFIG,
+        googleSheetsConfig: DEFAULT_SHEETS_CONFIG
+      }, null, 2), 'utf-8');
+    } catch (e) {
+      console.warn('Failed to seed initial config file:', e);
+    }
+  }
+
+  // Ensure active line token is seeded
+  if (!activeLineChannelAccessToken) {
+    activeLineChannelAccessToken = DEFAULT_LINE_CONFIG.channelAccessToken;
+  }
+
   // Load configuration endpoint
   app.get('/api/config', (req, res) => {
     try {
       if (fs.existsSync(CONFIG_FILE)) {
         const raw = fs.readFileSync(CONFIG_FILE, 'utf-8');
-        return res.json(JSON.parse(raw));
+        const parsed = JSON.parse(raw);
+        return res.json({
+          lineConfig: { ...DEFAULT_LINE_CONFIG, ...(parsed.lineConfig || {}) },
+          googleSheetsConfig: { ...DEFAULT_SHEETS_CONFIG, ...(parsed.googleSheetsConfig || {}) }
+        });
       }
-      return res.json({ lineConfig: null, googleSheetsConfig: null });
+      return res.json({ lineConfig: DEFAULT_LINE_CONFIG, googleSheetsConfig: DEFAULT_SHEETS_CONFIG });
     } catch (err: any) {
       console.error('Error reading config file:', err);
-      return res.status(500).json({ success: false, error: err.message });
+      return res.json({ lineConfig: DEFAULT_LINE_CONFIG, googleSheetsConfig: DEFAULT_SHEETS_CONFIG });
     }
   });
 
-  // Save configuration endpoint
+  // Save configuration endpoint (Safe Merging)
   app.post('/api/config', (req, res) => {
     try {
+      let currentConfig: any = {};
+      if (fs.existsSync(CONFIG_FILE)) {
+        try {
+          currentConfig = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf-8'));
+        } catch (e) {
+          currentConfig = {};
+        }
+      }
       const { lineConfig, googleSheetsConfig } = req.body;
-      const data = { lineConfig, googleSheetsConfig };
+      const data = {
+        lineConfig: lineConfig ? { ...(currentConfig.lineConfig || {}), ...lineConfig } : currentConfig.lineConfig,
+        googleSheetsConfig: googleSheetsConfig ? { ...(currentConfig.googleSheetsConfig || {}), ...googleSheetsConfig } : currentConfig.googleSheetsConfig
+      };
       fs.writeFileSync(CONFIG_FILE, JSON.stringify(data, null, 2), 'utf-8');
       
       // Update in-memory active token for real-time Webhook log pushes
-      if (lineConfig?.channelAccessToken) {
-        activeLineChannelAccessToken = lineConfig.channelAccessToken;
+      if (data.lineConfig?.channelAccessToken) {
+        activeLineChannelAccessToken = data.lineConfig.channelAccessToken;
       }
       
       return res.json({ success: true, message: 'บันทึกข้อมูลการตั้งค่าบนเซิร์ฟเวอร์สำเร็จเรียบร้อย!' });
@@ -296,15 +353,89 @@ async function startServer() {
     }
   });
 
-  // Save data store endpoint
+  // Save data store endpoint (Safe Merging)
   app.post('/api/data-store', (req, res) => {
     try {
+      let currentData: any = {};
+      if (fs.existsSync(DATA_STORE_FILE)) {
+        try {
+          currentData = JSON.parse(fs.readFileSync(DATA_STORE_FILE, 'utf-8'));
+        } catch (e) {
+          currentData = {};
+        }
+      }
       const { products, warehouses, inventory, inboundRecords, outboundRecords, users } = req.body;
-      const data = { products, warehouses, inventory, inboundRecords, outboundRecords, users };
+      const data = {
+        products: (products && products.length > 0) ? products : (currentData.products || []),
+        warehouses: (warehouses && warehouses.length > 0) ? warehouses : (currentData.warehouses || []),
+        inventory: (inventory && inventory.length > 0) ? inventory : (currentData.inventory || []),
+        inboundRecords: inboundRecords !== undefined ? inboundRecords : (currentData.inboundRecords || []),
+        outboundRecords: outboundRecords !== undefined ? outboundRecords : (currentData.outboundRecords || []),
+        users: (users && users.length > 0) ? users : (currentData.users || [])
+      };
       fs.writeFileSync(DATA_STORE_FILE, JSON.stringify(data, null, 2), 'utf-8');
       return res.json({ success: true, message: 'บันทึกข้อมูลคลังสินค้าและบัญชีพนักงานบนเซิร์ฟเวอร์เรียบร้อย!' });
     } catch (err: any) {
       console.error('Error writing data store file:', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Dedicated Users CRUD API
+  app.get('/api/users', (req, res) => {
+    try {
+      if (fs.existsSync(DATA_STORE_FILE)) {
+        const raw = fs.readFileSync(DATA_STORE_FILE, 'utf-8');
+        const parsed = JSON.parse(raw);
+        return res.json({ success: true, users: parsed.users || [] });
+      }
+      return res.json({ success: true, users: [] });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post('/api/users', (req, res) => {
+    try {
+      const user = req.body;
+      if (!user || (!user.firstName && !user.employeeCode)) {
+        return res.status(400).json({ success: false, message: 'ข้อมูลผู้ใช้ไม่ครบถ้วน' });
+      }
+      let currentData: any = {};
+      if (fs.existsSync(DATA_STORE_FILE)) {
+        try {
+          currentData = JSON.parse(fs.readFileSync(DATA_STORE_FILE, 'utf-8'));
+        } catch (e) {
+          currentData = {};
+        }
+      }
+      const usersList: any[] = currentData.users || [];
+      const existingIdx = usersList.findIndex((u: any) => u.id === user.id);
+      if (existingIdx >= 0) {
+        usersList[existingIdx] = { ...usersList[existingIdx], ...user };
+      } else {
+        usersList.push(user);
+      }
+      currentData.users = usersList;
+      fs.writeFileSync(DATA_STORE_FILE, JSON.stringify(currentData, null, 2), 'utf-8');
+      return res.json({ success: true, user, users: usersList });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.delete('/api/users/:id', (req, res) => {
+    try {
+      const { id } = req.params;
+      let currentData: any = {};
+      if (fs.existsSync(DATA_STORE_FILE)) {
+        currentData = JSON.parse(fs.readFileSync(DATA_STORE_FILE, 'utf-8'));
+      }
+      const usersList: any[] = (currentData.users || []).filter((u: any) => u.id !== id);
+      currentData.users = usersList;
+      fs.writeFileSync(DATA_STORE_FILE, JSON.stringify(currentData, null, 2), 'utf-8');
+      return res.json({ success: true, users: usersList });
+    } catch (err: any) {
       return res.status(500).json({ success: false, error: err.message });
     }
   });

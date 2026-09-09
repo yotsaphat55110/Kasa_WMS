@@ -254,13 +254,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const updateGoogleSheetsConfig = (partial: Partial<GoogleSheetsConfig>) => {
     setGoogleSheetsConfig(prev => {
       const updated = { ...prev, ...partial };
-      if (hasLoadedFromServer) {
-        fetch('/api/config', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ lineConfig, googleSheetsConfig: updated })
-        }).catch(err => console.warn('Error saving googleSheetsConfig to server:', err));
-      }
+      fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ googleSheetsConfig: updated })
+      }).catch(err => console.warn('Error saving googleSheetsConfig to server:', err));
       return updated;
     });
   };
@@ -479,6 +477,24 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // --- SERVER SYNCHRONIZATION & MULTI-DEVICE PERSISTENCE ---
 
+  // Helper to persist master data store safely to server
+  const persistDataStore = (partialData: {
+    products?: Product[];
+    warehouses?: Warehouse[];
+    inventory?: InventoryItem[];
+    inboundRecords?: InboundRecord[];
+    outboundRecords?: OutboundRecord[];
+    users?: User[];
+  }) => {
+    fetch('/api/data-store', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(partialData)
+    }).catch(err => console.warn('Failed to persist data store to server:', err));
+  };
+
+  // --- SERVER SYNCHRONIZATION & MULTI-DEVICE PERSISTENCE ---
+
   // 1. Load initial configs and data store from server on mount
   useEffect(() => {
     const initServerSync = async () => {
@@ -488,10 +504,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         if (configRes.ok) {
           const configData = await configRes.json();
           if (configData.lineConfig) {
-            setLineConfig(configData.lineConfig);
+            setLineConfig(prev => ({ ...prev, ...configData.lineConfig }));
           }
           if (configData.googleSheetsConfig) {
-            setGoogleSheetsConfig(configData.googleSheetsConfig);
+            setGoogleSheetsConfig(prev => ({ ...prev, ...configData.googleSheetsConfig }));
           }
         }
 
@@ -499,47 +515,63 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const storeRes = await fetch('/api/data-store');
         if (storeRes.ok) {
           const storeData = await storeRes.json();
-          if (storeData.products) setProducts(storeData.products);
-          if (storeData.warehouses) setWarehouses(storeData.warehouses);
-          if (storeData.inventory) setInventory(storeData.inventory);
-          if (storeData.inboundRecords) setInboundRecords(storeData.inboundRecords);
-          if (storeData.outboundRecords) setOutboundRecords(storeData.outboundRecords);
-          if (storeData.users) setUsers(storeData.users);
+          if (storeData.products && Array.isArray(storeData.products) && storeData.products.length > 0) setProducts(storeData.products);
+          if (storeData.warehouses && Array.isArray(storeData.warehouses) && storeData.warehouses.length > 0) setWarehouses(storeData.warehouses);
+          if (storeData.inventory && Array.isArray(storeData.inventory) && storeData.inventory.length > 0) setInventory(storeData.inventory);
+          if (storeData.inboundRecords && Array.isArray(storeData.inboundRecords)) setInboundRecords(storeData.inboundRecords);
+          if (storeData.outboundRecords && Array.isArray(storeData.outboundRecords)) setOutboundRecords(storeData.outboundRecords);
+          if (storeData.users && Array.isArray(storeData.users) && storeData.users.length > 0) setUsers(storeData.users);
+        }
+
+        // Dedicated users check to ensure custom users are always loaded
+        const usersRes = await fetch('/api/users');
+        if (usersRes.ok) {
+          const usersData = await usersRes.json();
+          if (usersData.users && Array.isArray(usersData.users) && usersData.users.length > 0) {
+            setUsers(usersData.users);
+          }
         }
       } catch (err) {
         console.warn('Initial server sync failed:', err);
       } finally {
-        // Flag that loading is done, so we can start listening for local changes to save back
         setHasLoadedFromServer(true);
       }
     };
 
     initServerSync();
 
-    // 2. Background polling (every 10 seconds) to fetch live changes made on other devices
+    // 2. Background polling (every 6 seconds) to fetch live changes made on other devices
     const interval = setInterval(async () => {
       try {
         const storeRes = await fetch('/api/data-store');
         if (storeRes.ok) {
           const storeData = await storeRes.json();
-          if (storeData.products) setProducts(storeData.products);
-          if (storeData.warehouses) setWarehouses(storeData.warehouses);
-          if (storeData.inventory) setInventory(storeData.inventory);
-          if (storeData.inboundRecords) setInboundRecords(storeData.inboundRecords);
-          if (storeData.outboundRecords) setOutboundRecords(storeData.outboundRecords);
-          if (storeData.users) setUsers(storeData.users);
+          if (storeData.products && Array.isArray(storeData.products) && storeData.products.length > 0) setProducts(storeData.products);
+          if (storeData.warehouses && Array.isArray(storeData.warehouses) && storeData.warehouses.length > 0) setWarehouses(storeData.warehouses);
+          if (storeData.inventory && Array.isArray(storeData.inventory) && storeData.inventory.length > 0) setInventory(storeData.inventory);
+          if (storeData.inboundRecords && Array.isArray(storeData.inboundRecords)) setInboundRecords(storeData.inboundRecords);
+          if (storeData.outboundRecords && Array.isArray(storeData.outboundRecords)) setOutboundRecords(storeData.outboundRecords);
+          if (storeData.users && Array.isArray(storeData.users) && storeData.users.length > 0) setUsers(storeData.users);
+        }
+
+        const usersRes = await fetch('/api/users');
+        if (usersRes.ok) {
+          const usersData = await usersRes.json();
+          if (usersData.users && Array.isArray(usersData.users) && usersData.users.length > 0) {
+            setUsers(usersData.users);
+          }
         }
 
         const configRes = await fetch('/api/config');
         if (configRes.ok) {
           const configData = await configRes.json();
-          if (configData.lineConfig) setLineConfig(configData.lineConfig);
-          if (configData.googleSheetsConfig) setGoogleSheetsConfig(configData.googleSheetsConfig);
+          if (configData.lineConfig) setLineConfig(prev => ({ ...prev, ...configData.lineConfig }));
+          if (configData.googleSheetsConfig) setGoogleSheetsConfig(prev => ({ ...prev, ...configData.googleSheetsConfig }));
         }
       } catch (err) {
         console.warn('Background polling failed:', err);
       }
-    }, 10000);
+    }, 6000);
 
     return () => clearInterval(interval);
   }, []);
@@ -596,31 +628,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       initLiff();
     }
   }, [lineConfig?.liffId, hasLoadedFromServer, users]);
-
-  // 4. Save data store to server whenever it changes
-  useEffect(() => {
-    if (!hasLoadedFromServer) return;
-
-    const saveDataToServer = async () => {
-      try {
-        await fetch('/api/data-store', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            products,
-            warehouses,
-            inventory,
-            inboundRecords,
-            outboundRecords,
-            users
-          })
-        });
-      } catch (err) {
-        console.warn('Error saving data store to server:', err);
-      }
-    };
-    saveDataToServer();
-  }, [products, warehouses, inventory, inboundRecords, outboundRecords, users, hasLoadedFromServer]);
 
   // --------------------------------------------------------
 
@@ -689,41 +696,44 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       transactionCode: txCode
     };
 
-    setInboundRecords(prev => [newRecord, ...prev]);
+    setInboundRecords(prevInbound => {
+      const updatedInbound = [newRecord, ...prevInbound];
+      setInventory(prevInv => {
+        let updatedInv: InventoryItem[];
+        const existingIdx = prevInv.findIndex(
+          inv => inv.productId === data.productId && inv.warehouseId === data.warehouseId && inv.zoneId === data.zoneId
+        );
 
-    // Update Inventory
-    setInventory(prev => {
-      const existingIdx = prev.findIndex(
-        inv => inv.productId === data.productId && inv.warehouseId === data.warehouseId && inv.zoneId === data.zoneId
-      );
-
-      if (existingIdx >= 0) {
-        const updated = [...prev];
-        const item = { ...updated[existingIdx] };
-        
-        if (data.condition === 'DAMAGED') {
-          item.quantityDamaged += data.quantity;
+        if (existingIdx >= 0) {
+          updatedInv = [...prevInv];
+          const item = { ...updatedInv[existingIdx] };
+          
+          if (data.condition === 'DAMAGED') {
+            item.quantityDamaged += data.quantity;
+          } else {
+            item.quantityGood += data.quantity;
+          }
+          item.lastUpdated = new Date().toISOString();
+          item.lastAdjustedBy = `${currentUser.firstName} (${currentUser.employeeCode})`;
+          updatedInv[existingIdx] = item;
         } else {
-          item.quantityGood += data.quantity;
+          // Create new inventory allocation
+          const newItem: InventoryItem = {
+            id: `inv-${data.productId}-${data.warehouseId}-${Date.now()}`,
+            productId: data.productId,
+            warehouseId: data.warehouseId,
+            zoneId: data.zoneId,
+            quantityGood: data.condition === 'DAMAGED' ? 0 : data.quantity,
+            quantityDamaged: data.condition === 'DAMAGED' ? data.quantity : 0,
+            lastUpdated: new Date().toISOString(),
+            lastAdjustedBy: `${currentUser.firstName} (${currentUser.employeeCode})`
+          };
+          updatedInv = [newItem, ...prevInv];
         }
-        item.lastUpdated = new Date().toISOString();
-        item.lastAdjustedBy = `${currentUser.firstName} (${currentUser.employeeCode})`;
-        updated[existingIdx] = item;
-        return updated;
-      } else {
-        // Create new inventory allocation
-        const newItem: InventoryItem = {
-          id: `inv-${data.productId}-${data.warehouseId}-${Date.now()}`,
-          productId: data.productId,
-          warehouseId: data.warehouseId,
-          zoneId: data.zoneId,
-          quantityGood: data.condition === 'DAMAGED' ? 0 : data.quantity,
-          quantityDamaged: data.condition === 'DAMAGED' ? data.quantity : 0,
-          lastUpdated: new Date().toISOString(),
-          lastAdjustedBy: `${currentUser.firstName} (${currentUser.employeeCode})`
-        };
-        return [newItem, ...prev];
-      }
+        persistDataStore({ inboundRecords: updatedInbound, inventory: updatedInv });
+        return updatedInv;
+      });
+      return updatedInbound;
     });
 
     // Audit Log
@@ -784,41 +794,45 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       transactionCode: txCode
     };
 
-    setOutboundRecords(prev => [newRecord, ...prev]);
+    setOutboundRecords(prevOutbound => {
+      const updatedOutbound = [newRecord, ...prevOutbound];
+      setInventory(prevInv => {
+        let updatedInv: InventoryItem[];
+        const existingIdx = prevInv.findIndex(
+          inv => inv.productId === data.productId && inv.warehouseId === data.warehouseId && inv.zoneId === data.zoneId
+        );
 
-    // Deduct stock or create new record if zone stock doesn't exist yet
-    setInventory(prev => {
-      const existingIdx = prev.findIndex(
-        inv => inv.productId === data.productId && inv.warehouseId === data.warehouseId && inv.zoneId === data.zoneId
-      );
-
-      if (existingIdx >= 0) {
-        return prev.map((inv, idx) => {
-          if (idx === existingIdx) {
-            return {
-              ...inv,
-              quantityGood: data.condition === 'DAMAGED' ? inv.quantityGood : Math.max(0, inv.quantityGood - data.quantity),
-              quantityDamaged: data.condition === 'DAMAGED' ? Math.max(0, inv.quantityDamaged - data.quantity) : inv.quantityDamaged,
-              lastUpdated: new Date().toISOString(),
-              lastAdjustedBy: `${currentUser.firstName} (${currentUser.employeeCode})`
-            };
-          }
-          return inv;
-        });
-      } else {
-        // Create new inventory row with 0 initial stock for this product/warehouse/zone
-        const newItem: InventoryItem = {
-          id: `inv-${data.productId}-${data.warehouseId}-${Date.now()}`,
-          productId: data.productId,
-          warehouseId: data.warehouseId,
-          zoneId: data.zoneId,
-          quantityGood: 0,
-          quantityDamaged: 0,
-          lastUpdated: new Date().toISOString(),
-          lastAdjustedBy: `${currentUser.firstName} (${currentUser.employeeCode})`
-        };
-        return [newItem, ...prev];
-      }
+        if (existingIdx >= 0) {
+          updatedInv = prevInv.map((inv, idx) => {
+            if (idx === existingIdx) {
+              return {
+                ...inv,
+                quantityGood: data.condition === 'DAMAGED' ? inv.quantityGood : Math.max(0, inv.quantityGood - data.quantity),
+                quantityDamaged: data.condition === 'DAMAGED' ? Math.max(0, inv.quantityDamaged - data.quantity) : inv.quantityDamaged,
+                lastUpdated: new Date().toISOString(),
+                lastAdjustedBy: `${currentUser.firstName} (${currentUser.employeeCode})`
+              };
+            }
+            return inv;
+          });
+        } else {
+          // Create new inventory row with 0 initial stock for this product/warehouse/zone
+          const newItem: InventoryItem = {
+            id: `inv-${data.productId}-${data.warehouseId}-${Date.now()}`,
+            productId: data.productId,
+            warehouseId: data.warehouseId,
+            zoneId: data.zoneId,
+            quantityGood: 0,
+            quantityDamaged: 0,
+            lastUpdated: new Date().toISOString(),
+            lastAdjustedBy: `${currentUser.firstName} (${currentUser.employeeCode})`
+          };
+          updatedInv = [newItem, ...prevInv];
+        }
+        persistDataStore({ outboundRecords: updatedOutbound, inventory: updatedInv });
+        return updatedInv;
+      });
+      return updatedOutbound;
     });
 
     // Audit Log
@@ -886,8 +900,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Adjust Inventory
   const adjustInventory = (inventoryId: string, newGoodQty: number, newDamagedQty: number, reason: string) => {
     let affectedProduct = '';
-    setInventory(prev =>
-      prev.map(item => {
+    setInventory(prev => {
+      const updated = prev.map(item => {
         if (item.id === inventoryId) {
           affectedProduct = item.productId;
           return {
@@ -899,8 +913,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           };
         }
         return item;
-      })
-    );
+      });
+      persistDataStore({ inventory: updated });
+      return updated;
+    });
 
     const product = getProductById(affectedProduct);
     const prodName = product ? product.name : 'สินค้า';
@@ -920,9 +936,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Product CRUD
   const saveProduct = (productData: Partial<Product>) => {
     if (productData.id) {
-      setProducts(prev =>
-        prev.map(p => (p.id === productData.id ? ({ ...p, ...productData, updatedAt: new Date().toISOString() } as Product) : p))
-      );
+      setProducts(prev => {
+        const updated = prev.map(p => (p.id === productData.id ? ({ ...p, ...productData, updatedAt: new Date().toISOString() } as Product) : p));
+        persistDataStore({ products: updated });
+        return updated;
+      });
       addAuditLog('PRODUCT_UPDATE', `แก้ไขข้อมูลสินค้า ${productData.name} (${productData.code})`);
     } else {
       const newProd: Product = {
@@ -939,7 +957,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
-      setProducts(prev => [newProd, ...prev]);
+      setProducts(prev => {
+        const updated = [newProd, ...prev];
+        persistDataStore({ products: updated });
+        return updated;
+      });
       addAuditLog('PRODUCT_CREATE', `เพิ่มสินค้าใหม่ในระบบ ${newProd.name} (${newProd.code})`);
     }
   };
@@ -947,7 +969,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const deleteProduct = (id: string) => {
     const prod = getProductById(id);
     if (prod) {
-      setProducts(prev => prev.filter(p => p.id !== id));
+      setProducts(prev => {
+        const updated = prev.filter(p => p.id !== id);
+        persistDataStore({ products: updated });
+        return updated;
+      });
       addAuditLog('PRODUCT_UPDATE', `ลบสินค้า ${prod.name} (${prod.code}) ออกจากระบบ`);
     }
   };
@@ -955,9 +981,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Warehouse & Zone CRUD
   const saveWarehouse = (whData: Partial<Warehouse>) => {
     if (whData.id) {
-      setWarehouses(prev =>
-        prev.map(w => (w.id === whData.id ? ({ ...w, ...whData } as Warehouse) : w))
-      );
+      setWarehouses(prev => {
+        const updated = prev.map(w => (w.id === whData.id ? ({ ...w, ...whData } as Warehouse) : w));
+        persistDataStore({ warehouses: updated });
+        return updated;
+      });
       addAuditLog('STOCK_ADJUST', `แก้ไขข้อมูลคลังสินค้า ${whData.name} (${whData.code})`);
     } else {
       const newWh: Warehouse = {
@@ -967,7 +995,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         location: whData.location || 'อาคารใหม่',
         zones: []
       };
-      setWarehouses(prev => [...prev, newWh]);
+      setWarehouses(prev => {
+        const updated = [...prev, newWh];
+        persistDataStore({ warehouses: updated });
+        return updated;
+      });
       addAuditLog('STOCK_ADJUST', `สร้างคลังสินค้าใหม่ ${newWh.name} (${newWh.code})`);
     }
   };
@@ -984,7 +1016,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       return { success: false, message: `ไม่สามารถลบคลัง "${wh.name}" ได้ เนื่องจากยังมีสินค้าคงเหลือในคลังนี้` };
     }
 
-    setWarehouses(prev => prev.filter(w => w.id !== id));
+    setWarehouses(prev => {
+      const updated = prev.filter(w => w.id !== id);
+      persistDataStore({ warehouses: updated });
+      return updated;
+    });
     addAuditLog('STOCK_ADJUST', `ลบคลังสินค้า ${wh.name} (${wh.code})`);
     return { success: true, message: `ลบคลังสินค้า "${wh.name}" เรียบร้อยแล้ว` };
   };
@@ -993,8 +1029,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const targetWh = warehouses.find(w => w.id === warehouseId);
     if (!targetWh) return;
 
-    setWarehouses(prev =>
-      prev.map(wh => {
+    setWarehouses(prev => {
+      const updated = prev.map(wh => {
         if (wh.id === warehouseId) {
           let updatedZones: Zone[];
           if (zoneData.id) {
@@ -1013,8 +1049,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           return { ...wh, zones: updatedZones };
         }
         return wh;
-      })
-    );
+      });
+      persistDataStore({ warehouses: updated });
+      return updated;
+    });
   };
 
   const deleteZone = (warehouseId: string, zoneId: string) => {
@@ -1032,14 +1070,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       return { success: false, message: `ไม่สามารถลบโซน "${targetZone.name}" ได้ เนื่องจากยังมีสินค้าคงเหลือในโซนนี้` };
     }
 
-    setWarehouses(prev =>
-      prev.map(wh => {
+    setWarehouses(prev => {
+      const updated = prev.map(wh => {
         if (wh.id === warehouseId) {
           return { ...wh, zones: wh.zones.filter(z => z.id !== zoneId) };
         }
         return wh;
-      })
-    );
+      });
+      persistDataStore({ warehouses: updated });
+      return updated;
+    });
     addAuditLog('STOCK_ADJUST', `ลบโซน ${targetZone.name} ออกจากคลัง ${targetWh.name}`);
     return { success: true, message: `ลบโซน "${targetZone.name}" เรียบร้อยแล้ว` };
   };
@@ -1047,48 +1087,74 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // User CRUD
   const saveUser = (userData: Partial<User>) => {
     if (userData.id) {
-      setUsers(prev => prev.map(u => (u.id === userData.id ? ({ ...u, ...userData } as User) : u)));
+      setUsers(prev => {
+        const updated = prev.map(u => (u.id === userData.id ? ({ ...u, ...userData } as User) : u));
+        fetch('/api/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(userData)
+        }).catch(err => console.warn('Error saving user to server:', err));
+        persistDataStore({ users: updated });
+        return updated;
+      });
       addAuditLog('USER_UPDATE', `แก้ไขข้อมูลพนักงาน ${userData.firstName} ${userData.lastName} (${userData.employeeCode})`);
     } else {
       const newUser: User = {
         id: `u-${Date.now()}`,
         employeeCode: userData.employeeCode || `EMP-${Math.floor(100 + Math.random() * 900)}`,
+        username: userData.username || (userData.firstName ? userData.firstName.toLowerCase() : `user${Math.floor(100 + Math.random() * 900)}`),
+        password: userData.password || '123456',
         firstName: userData.firstName || 'พนักงาน',
         lastName: userData.lastName || 'ใหม่',
         email: userData.email || 'user@kasa.co.th',
         phone: userData.phone || '02-994-7478',
         status: userData.status ?? 1,
         role: userData.role || 'Warehouse Officer',
-        avatarUrl: `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=150`
+        avatarUrl: userData.avatarUrl || `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=150`
       };
-      setUsers(prev => [...prev, newUser]);
+      setUsers(prev => {
+        const updated = [...prev, newUser];
+        fetch('/api/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newUser)
+        }).catch(err => console.warn('Error creating user on server:', err));
+        persistDataStore({ users: updated });
+        return updated;
+      });
       addAuditLog('USER_CREATE', `เพิ่มพนักงานใหม่ ${newUser.firstName} ${newUser.lastName} (${newUser.employeeCode})`);
     }
   };
 
   const toggleUserStatus = (id: string) => {
-    setUsers(prev =>
-      prev.map(u => {
+    setUsers(prev => {
+      const updated = prev.map(u => {
         if (u.id === id) {
-          const newStatus = u.status === 1 ? 0 : 1;
+          const newStatus = (u.status === 1 ? 0 : 1) as 0 | 1;
+          const updatedUser = { ...u, status: newStatus };
+          fetch('/api/users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updatedUser)
+          }).catch(err => console.warn('Error toggling user status on server:', err));
           addAuditLog('USER_UPDATE', `เปลี่ยนสถานะพนักงาน ${u.firstName} ${u.lastName} เป็น ${newStatus === 1 ? 'ใช้งาน (Active)' : 'ไม่ใช้งาน (Inactive)'}`);
-          return { ...u, status: newStatus as 0 | 1 };
+          return updatedUser;
         }
         return u;
-      })
-    );
+      });
+      persistDataStore({ users: updated });
+      return updated;
+    });
   };
 
   const updateLineConfig = (config: Partial<LineConfig>) => {
     setLineConfig(prev => {
       const updated = { ...prev, ...config };
-      if (hasLoadedFromServer) {
-        fetch('/api/config', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ lineConfig: updated, googleSheetsConfig })
-        }).catch(err => console.warn('Error saving lineConfig to server:', err));
-      }
+      fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lineConfig: updated })
+      }).catch(err => console.warn('Error saving lineConfig to server:', err));
       return updated;
     });
     addAuditLog('LINE_CONFIG_UPDATE', 'อัปเดตการตั้งค่าการเชื่อมต่อ LINE OA และ Bot Notification');

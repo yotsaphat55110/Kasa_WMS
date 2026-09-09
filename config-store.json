@@ -10,7 +10,8 @@
     "notifyInbound": true,
     "notifyOutbound": true,
     "notifyDamaged": true,
-    "webhookStatus": "CONNECTED"
+    "webhookStatus": "CONNECTED",
+    "customDeployedUrl": "https://kasa-wms.onrender.com"
   },
   "googleSheetsConfig": {
     "webAppUrl": "",
